@@ -110,6 +110,9 @@ def compile(
             language="c++" if entry_point.suffix in {".cpp", ".cc"} else "c",
             standard=standard,
             flags=["-Wall", "-O2"] + (["-c"] if compile_only else []),
+            out_dir=str(out_dir),
+            save_logs=save_logs,
+            save_manifest=save_manifest,
         )
     else:
         # If manifest was loaded, we might still want to override some things via CLI?
@@ -122,18 +125,12 @@ def compile(
         if compile_only and "-c" not in manifest.flags:
             manifest.flags.append("-c")
 
-        # Set output persistence settings if they exist or use CLI defaults
-        # We store these as custom fields in manifest for internal use
-        manifest.__dict__.setdefault("out_dir", str(out_dir))
-        manifest.__dict__.setdefault("save_logs", save_logs)
-        manifest.__dict__.setdefault("save_manifest", save_manifest)
-
-        # Override with CLI if they are NOT defaults (user explicitly provided them)
+        # Persistence settings
         if str(out_dir) != "compiled":
             manifest.out_dir = str(out_dir)
-        if not save_logs:
+        if not save_logs: # If CLI explicitly set save_logs to False
             manifest.save_logs = False
-        if not save_manifest:
+        if not save_manifest: # If CLI explicitly set save_manifest to False
             manifest.save_manifest = False
 
         # Adjust output according to platform
@@ -291,7 +288,7 @@ def compile(
                 f.write(response_data)
 
             # Extract artifacts
-            out_dist = Path(getattr(manifest, "out_dir", "compiled"))
+            out_dist = Path(manifest.out_dir)
             out_dist.mkdir(exist_ok=True, parents=True)
 
             with tarfile.open(result_archive_path, "r:gz") as tar:
@@ -315,14 +312,14 @@ def compile(
                     console.print(f"Duration: [cyan]{res.get('duration')}s[/cyan]")
                     console.print(f"Artifacts saved to: [cyan]{out_dist}/[/cyan]")
 
-            if log_path.exists() and getattr(manifest, "save_logs", True):
+            if log_path.exists() and manifest.save_logs:
                 with open(log_path, "r") as f:
                     print("\n" + f.read())
 
             # Delete if not requested
-            if not getattr(manifest, "save_manifest", True) and res_path.exists():
+            if not manifest.save_manifest and res_path.exists():
                 res_path.unlink()
-            if not getattr(manifest, "save_logs", True) and log_path.exists():
+            if not manifest.save_logs and log_path.exists():
                 log_path.unlink()
 
         finally:

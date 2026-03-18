@@ -17,7 +17,10 @@ def generate_build_manifest(
     flags: List[str] = None,
     link_flags: List[str] = None,
     defines: List[str] = None,
-    platform: str = "linux"
+    platform: str = "linux",
+    out_dir: str = "dist",
+    save_logs: bool = True,
+    save_manifest: bool = True
 ) -> BuildManifest:
     """Generate a manifest for the compilation job."""
     
@@ -54,6 +57,9 @@ def generate_build_manifest(
         output=output,
         compiler=compiler,
         platform=platform,
+        out_dir=out_dir,
+        save_logs=save_logs,
+        save_manifest=save_manifest,
         timestamp=datetime.datetime.utcnow().isoformat() + "Z",
         checksum_sha256=get_sha256(entry_point) # Spec says "checksum of the archive", but build.json is inside.
         # Let's use the checksum of main entry file as a placeholder or it will be overriden later.

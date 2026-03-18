@@ -18,6 +18,9 @@ class BuildManifest:
     output: str = "a.out"
     compiler: str = "g++"
     platform: str = "linux" # default platform
+    out_dir: str = "dist"
+    save_logs: bool = True
+    save_manifest: bool = True
     timestamp: str = ""
     checksum_sha256: str = ""
 
