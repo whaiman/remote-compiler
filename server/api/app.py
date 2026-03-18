@@ -1,0 +1,327 @@
+import json
+import logging
+import os
+import shutil
+import tarfile
+import tempfile
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+# from fastapi import FastAPI, HTTPException, Request
+# from fastapi.responses import Response
+from starlette.applications import Starlette
+
+# from pydantic import BaseModel
+from starlette.background import BackgroundTask
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+
+from server.compiler.fallback import run_fallback_compilation
+from server.compiler.runner import run_compilation
+from server.jobs.store import job_store
+from shared.config import load_server_config
+from shared.crypto import (
+    compute_shared_key,
+    decrypt_payload,
+    encrypt_payload,
+    generate_ec_keypair,
+)
+from shared.manifest import BuildManifest
+
+# 1. Initialize App and Logger first so we can use them
+# app = FastAPI(title="Remote Compiler Server", version="0.1.0")
+logger = logging.getLogger("rgcc")
+
+# 2. Load configuration
+CFG = load_server_config()
+SERVER_CFG = CFG.get("server", {})
+AUTH_TOKEN = SERVER_CFG.get("auth_token")
+
+if not AUTH_TOKEN:
+    logger.error("Configuration error: 'auth_token' missing in server_config.yaml")
+    raise RuntimeError("Missing required configuration keys.")
+
+# Single server runtime master key for encrypting transient Session Tickets
+MASTER_TICKET_KEY = os.urandom(32).hex()
+
+@dataclass
+class HandshakeRequest:
+    public_key: str
+
+@dataclass
+class HandshakeResponse:
+    public_key: str
+    session_id: str
+
+    def to_dict(self):
+        return asdict(self)
+
+async def handshake(request: Request):
+    try:
+        data = await request.json()
+        req = HandshakeRequest(**data)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning(f"Invalid handshake request: {e}")
+        return JSONResponse({"detail": "Invalid request body or missing fields"}, status_code=400)
+
+    priv, pub = generate_ec_keypair()
+    aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
+
+    ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode("utf-8")
+    session_id = encrypt_payload(ticket_payload, MASTER_TICKET_KEY).hex()
+
+    resp = HandshakeResponse(public_key=pub, session_id=session_id)
+    return JSONResponse(asdict(resp))
+
+
+
+# --- FastAPI hanshake route method ---
+# @app.post("/api/handshake", response_model=HandshakeResponse)
+# async def handshake(req: HandshakeRequest):
+#     priv, pub = generate_ec_keypair()
+    
+#     # Securely mix auth_token into the ECDH derived secret
+#     # A MitM attacker will not be able to derive identical AES key without knowing auth_token
+#     aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
+    
+#     # Create stateless ticket valid for 60 seconds
+#     ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode("utf-8")
+#     session_id = encrypt_payload(ticket_payload, MASTER_TICKET_KEY).hex()
+    
+#     return HandshakeResponse(public_key=pub, session_id=session_id)
+
+async def compile(request: Request):
+    session_id = request.headers.get("X-Session-ID")
+    if not session_id:
+        return JSONResponse({"detail": "Missing session ID"}, status_code=400)
+    
+    try:
+        # Decrypt ticket
+        ticket_payload = decrypt_payload(bytes.fromhex(session_id), MASTER_TICKET_KEY)
+        ticket_data = json.loads(ticket_payload.decode("utf-8"))
+
+        # Check expiration (60 second TTL mitigates replay attacks)
+        if time.time() > ticket_data["exp"]:
+            return JSONResponse({"detail": "Ticket expired"}, status_code=401)
+        
+        encryption_key = ticket_data["key"]
+    except Exception as e:        
+        logger.warning(f"Invalid session check: {e}")
+        return JSONResponse({"detail":"Invalid session ticket"}, status_code=401)
+    body = await request.body()
+
+    # 1. Decrypt payload
+    try:
+        decrypted_data = decrypt_payload(body, encryption_key)
+    except Exception as e:
+        logger.error("Decryption failed: %s", e)
+        return JSONResponse({"detail": "Failed to decrypt payload"}, status_code=400)
+
+    # 2. Extract archive
+    work_dir = Path(tempfile.mkdtemp(prefix="rgcc_server_"))
+    try:
+        archive_path = work_dir / "request.tar.gz"
+        with open(archive_path, "wb") as f:
+            f.write(decrypted_data)
+
+        src_dir = work_dir / "src"
+        src_dir.mkdir()
+
+        with tarfile.open(archive_path, "r:gz") as tar:
+            tar.extractall(path=src_dir)
+
+        src_files = []
+        for root, _, files in os.walk(src_dir):
+            for f in files:
+                p = Path(root) / f
+                src_files.append(p.as_posix())
+                
+        # 3. Load manifest
+        manifest_path = src_dir / "build.json"
+
+        if manifest_path.exists():
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest_dict = json.load(f)
+                manifest = BuildManifest.from_dict(manifest_dict)
+                comp_result = run_compilation(manifest, work_dir, config=CFG)
+        else:
+            sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
+            if not sources:
+                return JSONResponse({"detail": "No source files found"}, status_code=400)
+            comp_result = run_fallback_compilation(sources[0], work_dir / "a.out")
+
+        # 4. Update job store
+        job_id = job_store.create_job()
+        manifest_res = {
+            "returncode": comp_result.returncode,
+            "duration": comp_result.duration,
+            "job_id": job_id,
+        }
+        job_store.update_job(
+            job_id,
+            "done" if comp_result.returncode == 0 else "failed",
+            manifest_res,
+            comp_result.stdout + comp_result.stderr,
+        )
+
+        # 5. Pack Response
+        response_archive_path = work_dir / "response.tar.gz"
+        with tarfile.open(response_archive_path, "w:gz") as tar:
+            log_path = work_dir / "compile.log"
+            with open(log_path, "w") as f:
+                f.write(comp_result.stdout)
+                f.write("\n--- stderr ---\n")
+                f.write(comp_result.stderr)
+            tar.add(log_path, arcname="compile.log")
+
+            res_json_path = work_dir / "manifest_result.json"
+            with open(res_json_path, "w") as f:
+                json.dump(manifest_res, f)
+            tar.add(res_json_path, arcname="manifest_result.json")
+
+            if comp_result.output_path and comp_result.output_path.exists():
+                tar.add(comp_result.output_path, arcname=comp_result.output_path.name)
+
+        # 6. Encrypt Response
+        with open(response_archive_path, "rb") as f:
+            response_data = f.read()
+        encrypted_resp = encrypt_payload(response_data, encryption_key)
+
+        return Response(
+            content=encrypted_resp,
+            media_type="application/octet-stream",
+            background=BackgroundTask(shutil.rmtree, work_dir, True),
+        )
+
+    except Exception as e:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        logger.exception("Unexpected error: %s", e)
+        return JSONResponse({"detail": str(e)}, status_code=500)
+    
+        
+
+# --- FastAPI compile route method ---
+# @app.post("/api/compile")
+# async def compile(request: Request):
+#     session_id = request.headers.get("X-Session-ID")
+#     if not session_id:
+#         raise HTTPException(status_code=400, detail="Missing session ID")
+        
+#     try:
+#         # Decrypt ticket
+#         ticket_payload = decrypt_payload(bytes.fromhex(session_id), MASTER_TICKET_KEY)
+#         ticket_data = json.loads(ticket_payload.decode("utf-8"))
+        
+#         # Check expiration (60 second TTL mitigates replay attacks)
+#         if time.time() > ticket_data["exp"]:
+#             raise ValueError("Ticket expired")
+            
+#         encryption_key = ticket_data["key"]
+#     except Exception as e:
+#         logger.warning(f"Invalid session check: {e}")
+#         raise HTTPException(status_code=401, detail="Invalid session ticket")
+
+#     body = await request.body()
+
+#     # 1. Decrypt payload
+#     try:
+#         decrypted_data = decrypt_payload(body, encryption_key)
+#     except Exception as e:
+#         logger.error("Decryption failed: %s", e)
+#         raise HTTPException(status_code=400, detail="Failed to decrypt payload")
+
+#     # 2. Extract archive
+#     work_dir = Path(tempfile.mkdtemp(prefix="rgcc_server_"))
+#     try:
+#         archive_path = work_dir / "request.tar.gz"
+#         with open(archive_path, "wb") as f:
+#             f.write(decrypted_data)
+
+#         src_dir = work_dir / "src"
+#         src_dir.mkdir()
+
+#         with tarfile.open(archive_path, "r:gz") as tar:
+#             tar.extractall(path=src_dir)
+
+#         # 3. Load manifest (build.json)
+#         manifest_path = src_dir / "build.json"
+
+#         comp_result: CompilationResult
+#         if manifest_path.exists():
+#             with open(manifest_path, "r", encoding="utf-8") as f:
+#                 manifest_dict = json.load(f)
+#                 manifest = BuildManifest.from_dict(manifest_dict)
+#                 comp_result = run_compilation(manifest, work_dir)
+#         else:
+#             # Fallback
+#             # Find the first source file?
+#             sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
+#             if not sources:
+#                 raise HTTPException(status_code=400, detail="No source files found")
+#             comp_result = run_fallback_compilation(sources[0], work_dir / "a.out")
+
+#         # 4. Update job store
+#         job_id = job_store.create_job()
+#         manifest_res = {
+#             "returncode": comp_result.returncode,
+#             "duration": comp_result.duration,
+#             "job_id": job_id,
+#         }
+#         job_store.update_job(
+#             job_id,
+#             "done" if comp_result.returncode == 0 else "failed",
+#             manifest_res,
+#             comp_result.stdout + comp_result.stderr,
+#         )
+
+#         # 5. Pack Response
+#         response_archive_path = work_dir / "response.tar.gz"
+#         with tarfile.open(response_archive_path, "w:gz") as tar:
+#             # compile.log
+#             log_path = work_dir / "compile.log"
+#             with open(log_path, "w") as f:
+#                 f.write(comp_result.stdout)
+#                 f.write("\n--- stderr ---\n")
+#                 f.write(comp_result.stderr)
+#             tar.add(log_path, arcname="compile.log")
+
+#             # manifest_result.json
+#             res_json_path = work_dir / "manifest_result.json"
+#             with open(res_json_path, "w") as f:
+#                 json.dump(manifest_res, f)
+#             tar.add(res_json_path, arcname="manifest_result.json")
+
+#             # binary if exists
+#             if comp_result.output_path and comp_result.output_path.exists():
+#                 tar.add(comp_result.output_path, arcname=comp_result.output_path.name)
+
+#         # 6. Encrypt Response
+#         with open(response_archive_path, "rb") as f:
+#             response_data = f.read()
+
+#         encrypted_resp = encrypt_payload(response_data, encryption_key)
+
+#         return Response(
+#             content=encrypted_resp,
+#             media_type="application/octet-stream",
+#             background=BackgroundTask(shutil.rmtree, work_dir, True),
+#         )
+
+#     except HTTPException:
+#         shutil.rmtree(work_dir, ignore_errors=True)
+#         raise
+#     except Exception as e:
+#         shutil.rmtree(work_dir, ignore_errors=True)
+#         logger.exception("Unexpected error: %s", e)
+#         # Try to return encrypted error?
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+routes = [
+    Route("/api/compile", compile, methods=["POST"]),
+    Route("/api/handshake", handshake, methods=["POST"])
+]
+
+app = Starlette(routes=routes)

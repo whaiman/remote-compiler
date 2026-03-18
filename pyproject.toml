@@ -1,0 +1,22 @@
+[project]
+name = "remote-compiler"
+version = "0.1.0"
+description = "Remote C/C++ Compiler System"
+authors = [{name = "whaiman"}]
+dependencies = [
+    "starlette",
+    "uvicorn",
+    "cryptography",
+    "httpx",
+    "pyyaml",
+    "typer[all]",
+    "rich",
+    "python-multipart"
+]
+
+[project.scripts]
+rgcc = "client.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
