@@ -46,6 +46,16 @@ def _detect_language(entry_point: Path) -> str:
     return "c++" if entry_point.suffix.lower() in _CPP_EXTENSIONS else "c"
 
 
+def _detect_standard(language: str) -> str:
+    return "c11" if language == "c" else "c++17"
+
+
+def _get_available_standards(language: str) -> list[str]:
+    if language == "c":
+        return ["c89", "c90", "c99", "c11", "c17", "gnu99", "gnu11", "gnu17"]
+    return ["c++11", "c++14", "c++17", "c++20", "c++23", "gnu++17", "gnu++20"]
+
+
 def _detect_compiler(entry_point: Path) -> str:
     return "g++" if _detect_language(entry_point) == "c++" else "gcc"
 
@@ -118,7 +128,12 @@ def _run_interactive(
         manifest.platform = _detect_platform()
 
     manifest.compiler = typer.prompt("Compiler executable", default=manifest.compiler)
-    manifest.standard = typer.prompt("Language standard", default=manifest.standard)
+    
+    standards = _get_available_standards(manifest.language)
+    manifest.standard = typer.prompt(
+        f"Language standard ({', '.join(standards)})", default=manifest.standard
+    )
+    
     manifest.platform = typer.prompt("Target platform", default=manifest.platform)
     manifest.output = typer.prompt("Output binary name", default=manifest.output)
     manifest.out_dir = typer.prompt("Artifacts directory", default=manifest.out_dir)
@@ -232,7 +247,7 @@ def compile(
     compile_only: bool = typer.Option(
         False, "--compile-only", help="Compile only, don't link"
     ),
-    standard: str = typer.Option("c++17", "--std", help="Language standard"),
+    standard: Optional[str] = typer.Option(None, "--std", help="Language standard (auto-detected if omitted)"),
     platform: Optional[str] = typer.Option(
         None, "--platform", help="Target platform (linux, win64, darwin)"
     ),
@@ -271,7 +286,7 @@ def compile(
             output=output or _output_name(entry_point.stem, detected_platform),
             language=_detect_language(entry_point),
             compiler=_detect_compiler(entry_point),
-            standard=standard,
+            standard=standard or _detect_standard(_detect_language(entry_point)),
             platform=detected_platform,
             flags=flags,
             out_dir=str(out_dir),
@@ -350,7 +365,7 @@ def init(
     output: Optional[str] = typer.Option(
         None, "-o", "--output", help="Output filename (default: entry point stem)"
     ),
-    standard: str = typer.Option("c++17", "--std", help="Language standard"),
+    standard: Optional[str] = typer.Option(None, "--std", help="Language standard"),
     platform: Optional[str] = typer.Option(
         None,
         "--platform",
@@ -377,14 +392,15 @@ def init(
 
     detected_platform = platform or _detect_platform()
     console.print("Analyzing project and generating manifest...")
+    detected_language = _detect_language(entry_point)
     manifest = generate_build_manifest(
         entry_point,
         project_root,
         collect_sources(entry_point, project_root),
         output=output or _output_name(entry_point.stem, detected_platform),
-        language=_detect_language(entry_point),
+        language=detected_language,
         compiler=_detect_compiler(entry_point),
-        standard=standard,
+        standard=standard or _detect_standard(detected_language),
         platform=detected_platform,
         out_dir=out_dir,
         save_logs=False,

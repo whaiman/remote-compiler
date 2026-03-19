@@ -1,10 +1,15 @@
-import yaml
 import secrets
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
-SERVER_CONFIG_PATH = PROJECT_ROOT / "server_config.yaml"
-CLIENT_CONFIG_PATH = PROJECT_ROOT / "client_config.yaml"
+import yaml
+
+# Server is usually run per-environment, so standard practice is to use the current working directory.
+SERVER_CONFIG_PATH = Path.cwd() / "server_config.yaml"
+
+# The client is a global CLI tool, so we store its configuration globally in the user's home directory!
+CLIENT_CONFIG_DIR = Path.home() / ".rgcc"
+CLIENT_CONFIG_PATH = CLIENT_CONFIG_DIR / "client_config.yaml"
+
 
 def load_server_config() -> dict:
     """Load server config or create it if missing. Does NOT touch client config."""
@@ -20,7 +25,7 @@ def load_server_config() -> dict:
                 "log_file": "server.log",
                 "enable_file_logging": False,
                 "enable_console_logging": True,
-            }
+            },
         }
         with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False)
@@ -28,6 +33,7 @@ def load_server_config() -> dict:
 
     with open(SERVER_CONFIG_PATH, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
 
 def load_client_config() -> dict:
     """Load client config or create it if missing. Does NOT touch server config."""
@@ -39,6 +45,7 @@ def load_client_config() -> dict:
                 "auth_token": "PASTE_TOKEN_FROM_SERVER_CONFIG",
             }
         }
+        CLIENT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with open(CLIENT_CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False)
         return config

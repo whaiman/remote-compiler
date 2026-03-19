@@ -60,7 +60,7 @@ pip install ".[server]"
 On the dedicated compiling node, start the build server. Ensure `gcc`, `g++`, or `clang` are locally accessible in the system path.
 
 ```bash
-python -m server
+rgcc-server
 ```
 
 **On the initial boot**, the server drops a `server_config.yaml` file in the execution directory containing cryptographically secure credentials.

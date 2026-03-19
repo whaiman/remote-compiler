@@ -5,7 +5,8 @@ import uvicorn
 from server.api.app import app
 from shared.config import load_server_config
 
-if __name__ == "__main__":
+
+def main():
     cfg = load_server_config()
 
     # Configure logging
@@ -18,3 +19,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app, host=server_cfg.get("host", "0.0.0.0"), port=server_cfg.get("port", 4444)
     )
+
+
+if __name__ == "__main__":
+    main()
