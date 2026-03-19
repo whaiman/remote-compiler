@@ -46,9 +46,11 @@ if not AUTH_TOKEN:
 # Single server runtime master key for encrypting transient Session Tickets
 MASTER_TICKET_KEY = os.urandom(32).hex()
 
+
 @dataclass
 class HandshakeRequest:
     public_key: str
+
 
 @dataclass
 class HandshakeResponse:
@@ -58,45 +60,50 @@ class HandshakeResponse:
     def to_dict(self):
         return asdict(self)
 
+
 async def handshake(request: Request):
     try:
         data = await request.json()
         req = HandshakeRequest(**data)
     except (json.JSONDecodeError, TypeError) as e:
         logger.warning(f"Invalid handshake request: {e}")
-        return JSONResponse({"detail": "Invalid request body or missing fields"}, status_code=400)
+        return JSONResponse(
+            {"detail": "Invalid request body or missing fields"}, status_code=400
+        )
 
     priv, pub = generate_ec_keypair()
     aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
 
-    ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode("utf-8")
+    ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode(
+        "utf-8"
+    )
     session_id = encrypt_payload(ticket_payload, MASTER_TICKET_KEY).hex()
 
     resp = HandshakeResponse(public_key=pub, session_id=session_id)
     return JSONResponse(asdict(resp))
 
 
-
 # --- FastAPI hanshake route method ---
 # @app.post("/api/handshake", response_model=HandshakeResponse)
 # async def handshake(req: HandshakeRequest):
 #     priv, pub = generate_ec_keypair()
-    
+
 #     # Securely mix auth_token into the ECDH derived secret
 #     # A MitM attacker will not be able to derive identical AES key without knowing auth_token
 #     aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
-    
+
 #     # Create stateless ticket valid for 60 seconds
 #     ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode("utf-8")
 #     session_id = encrypt_payload(ticket_payload, MASTER_TICKET_KEY).hex()
-    
+
 #     return HandshakeResponse(public_key=pub, session_id=session_id)
+
 
 async def compile(request: Request):
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
         return JSONResponse({"detail": "Missing session ID"}, status_code=400)
-    
+
     try:
         # Decrypt ticket
         ticket_payload = decrypt_payload(bytes.fromhex(session_id), MASTER_TICKET_KEY)
@@ -105,11 +112,11 @@ async def compile(request: Request):
         # Check expiration (60 second TTL mitigates replay attacks)
         if time.time() > ticket_data["exp"]:
             return JSONResponse({"detail": "Ticket expired"}, status_code=401)
-        
+
         encryption_key = ticket_data["key"]
-    except Exception as e:        
+    except Exception as e:
         logger.warning(f"Invalid session check: {e}")
-        return JSONResponse({"detail":"Invalid session ticket"}, status_code=401)
+        return JSONResponse({"detail": "Invalid session ticket"}, status_code=401)
     body = await request.body()
 
     # 1. Decrypt payload
@@ -130,14 +137,14 @@ async def compile(request: Request):
         src_dir.mkdir()
 
         with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=src_dir)
+            tar.extractall(path=src_dir, filter="data")
 
         src_files = []
         for root, _, files in os.walk(src_dir):
             for f in files:
                 p = Path(root) / f
                 src_files.append(p.as_posix())
-                
+
         # 3. Load manifest
         manifest_path = src_dir / "build.json"
 
@@ -149,7 +156,9 @@ async def compile(request: Request):
         else:
             sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
             if not sources:
-                return JSONResponse({"detail": "No source files found"}, status_code=400)
+                return JSONResponse(
+                    {"detail": "No source files found"}, status_code=400
+                )
             comp_result = run_fallback_compilation(sources[0], work_dir / "a.out")
 
         # 4. Update job store
@@ -199,8 +208,7 @@ async def compile(request: Request):
         shutil.rmtree(work_dir, ignore_errors=True)
         logger.exception("Unexpected error: %s", e)
         return JSONResponse({"detail": str(e)}, status_code=500)
-    
-        
+
 
 # --- FastAPI compile route method ---
 # @app.post("/api/compile")
@@ -208,16 +216,16 @@ async def compile(request: Request):
 #     session_id = request.headers.get("X-Session-ID")
 #     if not session_id:
 #         raise HTTPException(status_code=400, detail="Missing session ID")
-        
+
 #     try:
 #         # Decrypt ticket
 #         ticket_payload = decrypt_payload(bytes.fromhex(session_id), MASTER_TICKET_KEY)
 #         ticket_data = json.loads(ticket_payload.decode("utf-8"))
-        
+
 #         # Check expiration (60 second TTL mitigates replay attacks)
 #         if time.time() > ticket_data["exp"]:
 #             raise ValueError("Ticket expired")
-            
+
 #         encryption_key = ticket_data["key"]
 #     except Exception as e:
 #         logger.warning(f"Invalid session check: {e}")
@@ -321,7 +329,7 @@ async def compile(request: Request):
 
 routes = [
     Route("/api/compile", compile, methods=["POST"]),
-    Route("/api/handshake", handshake, methods=["POST"])
+    Route("/api/handshake", handshake, methods=["POST"]),
 ]
 
 app = Starlette(routes=routes)
