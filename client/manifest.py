@@ -1,9 +1,9 @@
-import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from shared.checksum import get_sha256
-from shared.manifest import BuildManifest
+from shared.manifest import BuildManifest, SOURCE_EXTENSIONS
 
 
 def generate_build_manifest(
@@ -14,53 +14,40 @@ def generate_build_manifest(
     language: str = "c++",
     standard: str = "c++17",
     compiler: str = "g++",
-    flags: List[str] = None,
-    link_flags: List[str] = None,
-    defines: List[str] = None,
+    flags: Optional[List[str]] = None,
+    defines: Optional[List[str]] = None,
     platform: str = "linux",
     out_dir: str = "dist",
     save_logs: bool = True,
-    save_manifest: bool = True
+    save_manifest: bool = True,
 ) -> BuildManifest:
     """Generate a manifest for the compilation job."""
-    
-    # Paths in manifest are relative to project_root
     rel_entry = entry_point.relative_to(project_root).as_posix()
-    
-    # Filter sources: we only want to pass actual source files to the compiler command line.
-    # Header files should be present in the src directory but NOT on the command line.
-    source_exts = {".cpp", ".c", ".cc", ".cxx", ".cp", ".c++"}
+
     rel_sources = [
-        s.relative_to(project_root).as_posix() 
-        for s in sources 
-        if s.suffix.lower() in source_exts
+        s.relative_to(project_root).as_posix()
+        for s in sources
+        if s.suffix.lower() in SOURCE_EXTENSIONS
     ]
-    
-    # Ensure entry_point is in sources if it wasn't captured (shouldn't happen)
     if rel_entry not in rel_sources:
         rel_sources.append(rel_entry)
-    
-    # Simplistic include_dirs extraction
-    include_dirs = sorted(list(set(s.parent.relative_to(project_root).as_posix() for s in sources)))
-    
+
+    include_dirs = sorted({s.parent.relative_to(project_root).as_posix() for s in sources})
+
     return BuildManifest(
-        schema_version="1.0",
-        target=entry_point.stem,
         language=language,
         standard=standard,
         entry_point=rel_entry,
         sources=rel_sources,
         include_dirs=include_dirs,
         defines=defines or [],
-        flags=flags or ["-Wall", "-Wextra", "-O2"],
-        link_flags=link_flags or [],
+        flags=flags or ["-Wall", "-O2", "-static"],
         output=output,
         compiler=compiler,
         platform=platform,
         out_dir=out_dir,
         save_logs=save_logs,
         save_manifest=save_manifest,
-        timestamp=datetime.datetime.utcnow().isoformat() + "Z",
-        checksum_sha256=get_sha256(entry_point) # Spec says "checksum of the archive", but build.json is inside.
-        # Let's use the checksum of main entry file as a placeholder or it will be overriden later.
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        checksum_sha256=get_sha256(entry_point),
     )
