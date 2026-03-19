@@ -4,18 +4,28 @@ version = "0.1.0"
 description = "Remote C/C++ Compiler System"
 authors = [{name = "whaiman"}]
 dependencies = [
+    "cryptography",
+    "pyyaml"
+]
+
+[project.optional-dependencies]
+client = [
+    "httpx",
+    "typer[all]",
+    "rich"
+]
+server = [
     "starlette",
     "uvicorn",
-    "cryptography",
-    "httpx",
-    "pyyaml",
-    "typer[all]",
-    "rich",
     "python-multipart"
 ]
 
 [project.scripts]
 rgcc = "client.cli:app"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
