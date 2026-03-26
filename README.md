@@ -12,7 +12,6 @@ RGCC is a robust, distributed compilation utility designed for remote building o
 
 > [!WARNING]
 > We intentionally avoided heavy frameworks (like FastAPI or Pydantic) that require complex C/Rust toolchains during installation. If a device can run standard Python, it can run RGCC.
-
 > [!NOTE]
 > While the server itself is lightweight, compilation speed depends entirely on your project's complexity and the hardware it's running on. Large C++ projects will still take time on mobile CPUs.
 

@@ -12,7 +12,7 @@ SOURCE_EXTENSIONS = {".cpp", ".c", ".cc", ".cxx", ".cp", ".c++"}
 class BuildManifest:
     schema_version: str = "1.0"
     language: str = "c++"
-    standard: str = "c++17"
+    standard: str = "c++23"
     entry_point: str = "src/main.cpp"
     sources: List[str] = field(default_factory=list)
     include_dirs: List[str] = field(default_factory=list)

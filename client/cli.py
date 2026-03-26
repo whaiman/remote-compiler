@@ -47,13 +47,13 @@ def _detect_language(entry_point: Path) -> str:
 
 
 def _detect_standard(language: str) -> str:
-    return "c11" if language == "c" else "c++17"
+    return "c17" if language == "c" else "c++23"
 
 
 def _get_available_standards(language: str) -> list[str]:
     if language == "c":
-        return ["c89", "c90", "c99", "c11", "c17", "gnu99", "gnu11", "gnu17"]
-    return ["c++11", "c++14", "c++17", "c++20", "c++23", "gnu++17", "gnu++20"]
+        return ["c89", "c90", "c99", "c11", "c17", "c23", "gnu99", "gnu11", "gnu17", "gnu23"]
+    return ["c++11", "c++14", "c++17", "c++20", "c++23", "gnu++17", "gnu++20", "gnu++23"]
 
 
 def _detect_compiler(entry_point: Path) -> str:
@@ -87,21 +87,39 @@ def _load_manifest(path: Path) -> Optional[BuildManifest]:
 def _apply_cli_overrides(
     manifest: BuildManifest,
     *,
+    entry_point: Path,
     platform: Optional[str],
     output: Optional[str],
-    standard: str,
+    standard: Optional[str],
     compile_only: bool,
     out_dir: Path,
     save_logs: bool,
     save_manifest_flag: bool,
 ) -> None:
-    """Apply CLI overrides to a loaded manifest in-place."""
+    """Apply CLI overrides to a loaded manifest in-place.
+
+    Fields not explicitly set via CLI fall back to language-based auto-detection
+    when the build.json still carries the dataclass defaults (i.e. the user
+    never customised them).
+    """
     if platform:
         manifest.platform = platform
     if output:
         manifest.output = output
-    if standard != "c++17":
+
+    # --- standard ---
+    if standard is not None:
+        # Explicit CLI value always wins.
         manifest.standard = standard
+    elif manifest.standard in ("c++17", "c++23", "c11", "c17"):
+        # Looks like a dataclass default — re-derive from the actual language.
+        manifest.standard = _detect_standard(manifest.language)
+
+    # --- compiler ---
+    if manifest.compiler in ("g++", "gcc"):
+        # Dataclass default — re-derive from the entry point language.
+        manifest.compiler = _detect_compiler(entry_point)
+
     if compile_only and "-c" not in manifest.flags:
         manifest.flags.append("-c")
     if str(out_dir) != "dist":
@@ -296,6 +314,7 @@ def compile(
     else:
         _apply_cli_overrides(
             manifest,
+            entry_point=entry_point,
             platform=platform,
             output=output,
             standard=standard,
