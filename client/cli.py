@@ -68,6 +68,25 @@ def _output_name(stem: str, platform_tag: str) -> str:
     return f"{stem}.exe" if platform_tag == "win64" else stem
 
 
+def _parse_include_dirs_from_flags(flags: list[str], base: Path) -> list[Path]:
+    """Extract -I paths from a flags list and resolve them against *base*.
+
+    Handles both ``-Ipath`` (single token) and ``-I path`` (two tokens).
+    Paths that don't exist inside *base* are silently dropped.
+    """
+    dirs: list[Path] = []
+    i = 0
+    while i < len(flags):
+        f = flags[i]
+        if f.startswith("-I") and len(f) > 2:
+            dirs.append((base / f[2:]).resolve())
+        elif f == "-I" and i + 1 < len(flags):
+            dirs.append((base / flags[i + 1]).resolve())
+            i += 1
+        i += 1
+    return [d for d in dirs if d.exists() and d.is_relative_to(base)]
+
+
 def _resolve_project_root(entry_point: Path) -> Path:
     cwd = Path.cwd()
     return cwd if entry_point.is_relative_to(cwd) else entry_point.parent
@@ -291,8 +310,13 @@ def compile(
     project_root = _resolve_project_root(entry_point)
     local_manifest_path = project_root / "build.json"
 
-    all_sources = collect_sources(entry_point, project_root)
+    # Load manifest first so we can extract -I flags before collecting sources.
     manifest = _load_manifest(local_manifest_path)
+
+    extra_include_dirs = _parse_include_dirs_from_flags(
+        manifest.flags if manifest else [], project_root
+    )
+    all_sources = collect_sources(entry_point, project_root, extra_include_dirs)
 
     if manifest is None:
         detected_platform = platform or _detect_platform()
