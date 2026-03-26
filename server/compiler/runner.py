@@ -53,10 +53,14 @@ def _build_command(manifest: BuildManifest, src_dir: Path, output_path: Path, co
 
     cmd.extend(manifest.flags)
 
-    # Include dirs (resolved to absolute)
+    # Always expose the project root so that <lib/header.hpp> style includes
+    # resolve correctly for local libraries bundled with the project.
+    cmd.extend(["-I", str(src_dir)])
+
+    # Additional include dirs declared in the manifest (resolved to absolute)
     for inc in manifest.include_dirs:
         inc_path = (src_dir / inc).resolve()
-        if inc_path.is_relative_to(src_dir):
+        if inc_path.is_relative_to(src_dir) and inc_path != src_dir:
             cmd.extend(["-I", str(inc_path)])
 
     # Defines
