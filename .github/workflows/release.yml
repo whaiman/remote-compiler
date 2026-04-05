@@ -47,7 +47,7 @@ jobs:
           name: changelog
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           body_path: CHANGES.md
           generate_release_notes: false
@@ -133,7 +133,7 @@ jobs:
           path: ./binaries/
 
       - name: Upload binaries to Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: ./binaries/*
           tag_name: ${{ github.ref_name }}
