@@ -27,9 +27,6 @@ class ApiClient:
     async def negotiate_key(self) -> None:
         """Negotiate an AES encryption key via ECDH exchange."""
         priv, pub = generate_ec_keypair()
-        headers = {
-            "Content-Type": "application/json",
-        }
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{self.endpoint}/api/handshake",
@@ -82,7 +79,9 @@ class ApiClient:
                     # If not json, let's try decrypting it?
                     try:
                         if not self.encryption_key:
-                            raise ValueError("No encryption key available for decryption")
+                            raise ValueError(
+                                "No encryption key available for decryption"
+                            )
                         decrypted_err = decrypt_payload(
                             response.content, self.encryption_key
                         )

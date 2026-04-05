@@ -20,7 +20,9 @@ class JobStore:
         self.jobs[job_id] = JobInfo(id=job_id, status="pending", manifest_result={})
         return job_id
 
-    def update_job(self, job_id: str, status: str, manifest_result: dict[str, Any], logs: str) -> None:
+    def update_job(
+        self, job_id: str, status: str, manifest_result: dict[str, Any], logs: str
+    ) -> None:
         if job_id in self.jobs:
             self.jobs[job_id].status = status
             self.jobs[job_id].manifest_result = manifest_result

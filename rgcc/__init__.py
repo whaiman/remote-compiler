@@ -1,3 +1,5 @@
+from typing import Any
+
 """RGCC - Remote GCC Compiler System"""
 
 __version__ = "2.0.0"
@@ -30,8 +32,6 @@ def _check_server_deps() -> None:
             f'Install: pip install "git+https://github.com/whaiman/remote-compiler.git#egg=remote-compiler[server]"'
         )
 
-
-from typing import Any
 
 def client_main() -> Any:
     _check_client_deps()

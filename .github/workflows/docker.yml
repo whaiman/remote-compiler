@@ -81,6 +81,12 @@ jobs:
 
           docker logs test-server
 
+          if ! (curl -s -f http://localhost:4444/health || curl -s -f http://localhost:4444/); then
+            echo "Server did not respond!"
+            docker ps -a
+            exit 1
+          fi
+
           docker ps | grep test-server
 
           docker exec test-server sh -c "netstat -tlnp 2>/dev/null || ss -tlnp" || true
