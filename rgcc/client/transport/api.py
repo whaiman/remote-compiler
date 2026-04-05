@@ -51,7 +51,10 @@ class ApiClient:
 
         # Encrypt the archive before sending
         try:
-            encrypted_data = encrypt_payload(archive_data, self.encryption_key)
+            current_key = self.encryption_key
+            if current_key is None:
+                raise ValueError("Encryption key not negotiated")
+            encrypted_data = encrypt_payload(archive_data, current_key)
         except Exception as e:
             logger.error("Encryption failed: %s", e)
             raise
@@ -78,13 +81,12 @@ class ApiClient:
                 except Exception:
                     # If not json, let's try decrypting it?
                     try:
-                        if not self.encryption_key:
+                        current_key = self.encryption_key
+                        if current_key is None:
                             raise ValueError(
                                 "No encryption key available for decryption"
                             )
-                        decrypted_err = decrypt_payload(
-                            response.content, self.encryption_key
-                        )
+                        decrypted_err = decrypt_payload(response.content, current_key)
                         detail = decrypted_err.decode("utf-8")
                     except Exception:
                         detail = response.text
@@ -96,6 +98,7 @@ class ApiClient:
 
     async def decrypt_response(self, response_payload: bytes) -> bytes:
         """Decrypt the server response."""
-        if not self.encryption_key:
+        current_key = self.encryption_key
+        if current_key is None:
             raise ValueError("Encryption key not negotiated")
-        return decrypt_payload(response_payload, self.encryption_key)
+        return decrypt_payload(response_payload, current_key)

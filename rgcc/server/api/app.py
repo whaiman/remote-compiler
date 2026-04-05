@@ -117,7 +117,7 @@ async def compile(request: Request) -> Response:
         src_dir.mkdir()
 
         with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=src_dir, filter="data")  # type: ignore
+            tar.extractall(path=src_dir, filter="data")
 
         src_files = []
         for root, _, current_files in os.walk(src_dir):

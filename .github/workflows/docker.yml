@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [server, client]
+        component: [server]
 
     steps:
       - name: Checkout repository
@@ -35,7 +35,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -56,15 +56,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.${{ matrix.component }}
+          file: ./Dockerfile.server
           push: false
           load: true
-          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:test
+          tags: ${{ env.IMAGE_PREFIX }}-server:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Smoke test (Server)
-        if: matrix.component == 'server'
         run: |
           mkdir -p config
           echo 'server:' > config/server.config.yaml
@@ -78,34 +77,24 @@ jobs:
             ${{ env.IMAGE_PREFIX }}-server:test
 
           sleep 5
-
           docker logs test-server
-
-          if ! (curl -s -f http://localhost:4444/health || curl -s -f http://localhost:4444/); then
-            echo "Server did not respond!"
+          
+          # Health check
+          if ! curl -s -f http://localhost:4444/health; then
+            echo "FATAL: Server health check failed!"
             docker ps -a
             exit 1
           fi
 
           docker ps | grep test-server
-
-          docker exec test-server sh -c "netstat -tlnp 2>/dev/null || ss -tlnp" || true
-
           docker stop test-server
           docker rm test-server
-
-      - name: Smoke test (Client)
-        if: matrix.component == 'client'
-        run: |
-          docker run --rm ${{ env.IMAGE_PREFIX }}-client:test --help
-
-          docker run --rm ${{ env.IMAGE_PREFIX }}-client:test --version || true
 
       - name: Run Trivy vulnerability scanner
         if: success() || failure()
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:test
+          image-ref: ${{ env.IMAGE_PREFIX }}-server:test
           format: sarif
           output: trivy-results.sarif
 
@@ -120,7 +109,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.${{ matrix.component }}
+          file: ./Dockerfile.server
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

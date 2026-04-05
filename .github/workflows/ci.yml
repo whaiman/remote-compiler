@@ -180,8 +180,6 @@ jobs:
               default_args: ["-std=c++17"]
           EOF
 
-
-
       - name: Create test C++ file and local config
         run: |
           mkdir -p test_project/config
