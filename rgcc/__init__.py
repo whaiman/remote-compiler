@@ -3,7 +3,7 @@
 __version__ = "2.0.0"
 
 
-def _check_client_deps():
+def _check_client_deps() -> None:
     missing = []
     for pkg in ["rich", "httpx", "typer"]:
         try:
@@ -17,7 +17,7 @@ def _check_client_deps():
         )
 
 
-def _check_server_deps():
+def _check_server_deps() -> None:
     missing = []
     for pkg in ["starlette", "uvicorn"]:
         try:
@@ -31,14 +31,16 @@ def _check_server_deps():
         )
 
 
-def client_main():
+from typing import Any
+
+def client_main() -> Any:
     _check_client_deps()
     from rgcc.client.cli import app
 
     return app()
 
 
-def server_main():
+def server_main() -> Any:
     _check_server_deps()
     from rgcc.server.__main__ import main
 

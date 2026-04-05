@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -18,7 +19,7 @@ def derive_key(password: str, salt: bytes) -> bytes:
     return kdf.derive(password.encode())
 
 
-def generate_ec_keypair():
+def generate_ec_keypair() -> tuple[Any, str]:
     """Generate an EC private key and its corresponding PEM public key string."""
     private_key = ec.generate_private_key(ec.SECP256R1())
     public_key = private_key.public_key()
@@ -29,7 +30,7 @@ def generate_ec_keypair():
     return private_key, pub_bytes.decode("utf-8")
 
 
-def compute_shared_key(private_key, peer_public_pem: str, auth_token: str) -> str:
+def compute_shared_key(private_key: Any, peer_public_pem: str, auth_token: str) -> str:
     """Compute an AES-256 derived key securely using an ECDH exchange."""
     peer_pub_bytes = peer_public_pem.encode("utf-8")
     peer_public_key = serialization.load_pem_public_key(peer_pub_bytes)

@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import httpx
 
@@ -14,16 +15,16 @@ logger = logging.getLogger("client.transport.api")
 
 
 class ApiClient:
-    def __init__(self, endpoint: str, auth_token: str):
+    def __init__(self, endpoint: str, auth_token: str) -> None:
         # Allow user to specify just base url or /api/compile
         if endpoint.endswith("/api/compile"):
             endpoint = endpoint[: -len("/api/compile")]
-        self.endpoint = endpoint.rstrip("/")
-        self.auth_token = auth_token
-        self.session_id = None
-        self.encryption_key = None
+        self.endpoint: str = endpoint.rstrip("/")
+        self.auth_token: str = auth_token
+        self.session_id: Optional[str] = None
+        self.encryption_key: Optional[str] = None
 
-    async def negotiate_key(self):
+    async def negotiate_key(self) -> None:
         """Negotiate an AES encryption key via ECDH exchange."""
         priv, pub = generate_ec_keypair()
         headers = {
@@ -33,7 +34,7 @@ class ApiClient:
             resp = await client.post(
                 f"{self.endpoint}/api/handshake",
                 json={"public_key": pub},
-                headers=headers,
+                headers={"Content-Type": "application/json"},
                 timeout=10,
             )
             if resp.status_code != 200:
@@ -60,7 +61,7 @@ class ApiClient:
 
         headers = {
             "Content-Type": "application/octet-stream",
-            "X-Session-ID": self.session_id,
+            "X-Session-ID": str(self.session_id),
         }
 
         async with httpx.AsyncClient() as client:
@@ -80,6 +81,8 @@ class ApiClient:
                 except Exception:
                     # If not json, let's try decrypting it?
                     try:
+                        if not self.encryption_key:
+                            raise ValueError("No encryption key available for decryption")
                         decrypted_err = decrypt_payload(
                             response.content, self.encryption_key
                         )
@@ -94,4 +97,6 @@ class ApiClient:
 
     async def decrypt_response(self, response_payload: bytes) -> bytes:
         """Decrypt the server response."""
+        if not self.encryption_key:
+            raise ValueError("Encryption key not negotiated")
         return decrypt_payload(response_payload, self.encryption_key)

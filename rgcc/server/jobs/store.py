@@ -1,18 +1,18 @@
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 
 @dataclass
 class JobInfo:
     id: str
     status: str
-    manifest_result: dict
+    manifest_result: dict[str, Any]
     logs: str = ""
 
 
 class JobStore:
-    def __init__(self):
+    def __init__(self) -> None:
         self.jobs: Dict[str, JobInfo] = {}
 
     def create_job(self) -> str:
@@ -20,7 +20,7 @@ class JobStore:
         self.jobs[job_id] = JobInfo(id=job_id, status="pending", manifest_result={})
         return job_id
 
-    def update_job(self, job_id: str, status: str, manifest_result: dict, logs: str):
+    def update_job(self, job_id: str, status: str, manifest_result: dict[str, Any], logs: str) -> None:
         if job_id in self.jobs:
             self.jobs[job_id].status = status
             self.jobs[job_id].manifest_result = manifest_result
@@ -31,5 +31,4 @@ class JobStore:
 
 
 # Singleton global job store
-job_store = JobStore()
 job_store = JobStore()

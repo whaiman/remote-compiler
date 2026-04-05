@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from typing import List
 
 TRANSIENT_FIELDS = {"timestamp", "checksum_sha256", "sources", "include_dirs"}
@@ -44,7 +45,7 @@ class BuildManifest:
         return cls.from_dict(json.loads(json_str))
 
     @classmethod
-    def from_dict(cls, data: dict) -> "BuildManifest":
+    def from_dict(cls, data: dict[str, Any]) -> "BuildManifest":
         # Ignore unknown fields for forward-compatibility
         known = {f.name for f in cls.__dataclass_fields__.values()}
         return cls(**{k: v for k, v in data.items() if k in known})

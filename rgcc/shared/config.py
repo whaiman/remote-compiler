@@ -1,14 +1,15 @@
 import secrets
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore
+from typing import Any
 
 # We explicitly place config files inside a local config/ directory
 SERVER_CONFIG_PATH = Path.cwd() / "config" / "server.config.yaml"
 CLIENT_CONFIG_PATH = Path.cwd() / "config" / "client.config.yaml"
 
 
-def load_server_config() -> dict:
+def load_server_config() -> dict[str, Any]:
     """Load server config or create it if missing. Does NOT touch client config."""
     if not SERVER_CONFIG_PATH.exists():
         SERVER_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -33,7 +34,7 @@ def load_server_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_client_config() -> dict:
+def load_client_config() -> dict[str, Any]:
     """Load client config or create it if missing. Does NOT touch server config."""
     if not CLIENT_CONFIG_PATH.exists():
         # Using placeholders so the user knows they MUST fill them

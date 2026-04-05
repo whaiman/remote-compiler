@@ -243,7 +243,10 @@ def _run_interactive(
 
 
 def _finalize_manifest(
-    manifest: BuildManifest, all_sources: list, project_root: Path, entry_point: Path
+    manifest: BuildManifest,
+    all_sources: list[Path],
+    project_root: Path,
+    entry_point: Path,
 ) -> None:
     """Stamp dynamic fields (sources, timestamp, checksum) onto the manifest."""
     manifest.sources = [
@@ -259,7 +262,10 @@ def _finalize_manifest(
 
 
 def _build_archive(
-    work_dir: Path, all_sources: list, project_root: Path, manifest: BuildManifest
+    work_dir: Path,
+    all_sources: list[Path],
+    project_root: Path,
+    manifest: BuildManifest,
 ) -> Path:
     """Pack sources + build.json into a payload archive."""
     archive_path = work_dir / "payload.tar.gz"
@@ -340,7 +346,7 @@ def compile(
     save_manifest: bool = typer.Option(
         True, "--manifest/--no-manifest", help="Whether to save manifest_result.json"
     ),
-):
+) -> None:
     """Compile and link a source tree on a remote server."""
     if not entry_point.exists():
         console.print(f"[bold red]Error:[/bold red] File {entry_point} not found.")
@@ -457,7 +463,7 @@ def init(
     out_dir: str = typer.Option(
         "dist", "-d", "--out-dir", help="Default artifacts directory"
     ),
-):
+) -> None:
     """Create a build.json file for this project."""
     if not entry_point.exists():
         console.print(f"[bold red]Error:[/bold red] File {entry_point} not found.")

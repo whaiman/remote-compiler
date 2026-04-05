@@ -4,7 +4,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from rgcc.shared.manifest import BuildManifest
 from rgcc.shared.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
@@ -24,7 +24,7 @@ class CompilationResult:
 
 
 def _build_command(
-    manifest: BuildManifest, src_dir: Path, output_path: Path, config: dict
+    manifest: BuildManifest, src_dir: Path, output_path: Path, config: dict[str, Any]
 ) -> list[str]:
     """Assemble the compiler command from manifest + server config."""
     compilers_cfg = config.get("compilers", {})
@@ -85,7 +85,7 @@ def _build_command(
 
 
 def run_compilation(
-    manifest: BuildManifest, working_dir: Path, config: dict = None
+    manifest: BuildManifest, working_dir: Path, config: dict[str, Any] | None = None
 ) -> CompilationResult:
     """Run a compilation task based on a manifest."""
     config = config or {}

@@ -52,11 +52,11 @@ class HandshakeResponse:
     public_key: str
     session_id: str
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-async def handshake(request: Request):
+async def handshake(request: Request) -> Response:
     try:
         data = await request.json()
         req = HandshakeRequest(**data)
@@ -78,7 +78,7 @@ async def handshake(request: Request):
     return JSONResponse(asdict(resp))
 
 
-async def compile(request: Request):
+async def compile(request: Request) -> Response:
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
         return JSONResponse({"detail": "Missing session ID"}, status_code=400)
@@ -109,27 +109,27 @@ async def compile(request: Request):
     work_dir = Path(tempfile.mkdtemp(prefix="rgcc_server_"))
     try:
         archive_path = work_dir / "request.tar.gz"
-        with open(archive_path, "wb") as f:
-            f.write(decrypted_data)
+        with open(archive_path, "wb") as archive_file:
+            archive_file.write(decrypted_data)
 
         src_dir = work_dir / "src"
         src_dir.mkdir()
 
         with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=src_dir, filter="data")
+            tar.extractall(path=src_dir, filter="data")  # type: ignore
 
         src_files = []
-        for root, _, files in os.walk(src_dir):
-            for f in files:
-                p = Path(root) / f
+        for root, _, current_files in os.walk(src_dir):
+            for filename in current_files:
+                p = Path(root) / filename
                 src_files.append(p.as_posix())
 
         # 3. Load manifest
         manifest_path = src_dir / "build.json"
 
         if manifest_path.exists():
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                manifest_dict = json.load(f)
+            with open(manifest_path, "r", encoding="utf-8") as manifest_file:
+                manifest_dict = json.load(manifest_file)
                 manifest = BuildManifest.from_dict(manifest_dict)
                 comp_result = run_compilation(manifest, work_dir, config=CFG)
         else:
@@ -158,23 +158,23 @@ async def compile(request: Request):
         response_archive_path = work_dir / "response.tar.gz"
         with tarfile.open(response_archive_path, "w:gz") as tar:
             log_path = work_dir / "compile.log"
-            with open(log_path, "w") as f:
-                f.write(comp_result.stdout)
-                f.write("\n--- stderr ---\n")
-                f.write(comp_result.stderr)
+            with open(log_path, "w", encoding="utf-8") as log_file:
+                log_file.write(comp_result.stdout)
+                log_file.write("\n--- stderr ---\n")
+                log_file.write(comp_result.stderr)
             tar.add(log_path, arcname="compile.log")
 
             res_json_path = work_dir / "manifest_result.json"
-            with open(res_json_path, "w") as f:
-                json.dump(manifest_res, f)
+            with open(res_json_path, "w", encoding="utf-8") as res_file:
+                json.dump(manifest_res, res_file)
             tar.add(res_json_path, arcname="manifest_result.json")
 
             if comp_result.output_path and comp_result.output_path.exists():
                 tar.add(comp_result.output_path, arcname=comp_result.output_path.name)
 
         # 6. Encrypt Response
-        with open(response_archive_path, "rb") as f:
-            response_data = f.read()
+        with open(response_archive_path, "rb") as response_file:
+            response_data = response_file.read()
         encrypted_resp = encrypt_payload(response_data, encryption_key)
 
         return Response(
@@ -189,7 +189,7 @@ async def compile(request: Request):
         return JSONResponse({"detail": str(e)}, status_code=500)
 
 
-async def health(request: Request):
+async def health(request: Request) -> Response:
     return JSONResponse({"status": "OK"})
 
 

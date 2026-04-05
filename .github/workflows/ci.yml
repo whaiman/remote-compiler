@@ -67,6 +67,7 @@ jobs:
           else
             pip install -e ".[dev]"
           fi
+          pip install pytest pytest-asyncio
 
       - name: Test lazy loading
         run: |
