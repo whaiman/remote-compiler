@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -94,6 +95,7 @@ jobs:
           docker run --rm ${{ env.IMAGE_PREFIX }}-client:test --version || true
 
       - name: Run Trivy vulnerability scanner
+        if: success() || failure()
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:test
@@ -101,7 +103,7 @@ jobs:
           output: trivy-results.sarif
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
