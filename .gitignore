@@ -198,3 +198,4 @@ build.json
 code_review.md
 server.log
 config/*.yaml
+logs_*

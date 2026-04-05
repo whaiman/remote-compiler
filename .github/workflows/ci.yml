@@ -133,14 +133,16 @@ jobs:
 
       - name: Install from wheel (client only)
         run: |
-          pip install dist/*-client-*-none-any.whl || pip install dist/*.whl
+          WHEEL=$(ls dist/*.whl | head -n 1)
+          pip install "${WHEEL}[client]"
           rgcc --help
           python -c "import rgcc; print('Client OK')"
           pip uninstall -y remote-compiler
 
       - name: Install from wheel (server only)
         run: |
-          pip install dist/*.whl
+          WHEEL=$(ls dist/*.whl | head -n 1)
+          pip install "${WHEEL}[server]"
           rgccd --help
           python -c "import rgcc; print('Server OK')"
 
@@ -177,21 +179,23 @@ jobs:
               default_args: ["-std=c++17"]
           EOF
 
-          cat > config/client.config.yaml << 'EOF'
-          client:
-            endpoint: http://127.0.0.1:4444
-            auth_token: "test-token-integration-12345"
-          EOF
 
-      - name: Create test C++ file
+
+      - name: Create test C++ file and local config
         run: |
-          mkdir -p test_project
+          mkdir -p test_project/config
           cat > test_project/main.cpp << 'EOF'
           #include <iostream>
           int main() {
               std::cout << "Hello from RGCC Integration Test" << std::endl;
               return 0;
           }
+          EOF
+
+          cat > test_project/config/client.config.yaml << 'EOF'
+          client:
+            endpoint: http://127.0.0.1:4444
+            auth_token: "test-token-integration-12345"
           EOF
 
       - name: Start server (background)
