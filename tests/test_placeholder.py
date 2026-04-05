@@ -1,5 +1,4 @@
 """Basic smoke tests for RGCC package structure."""
-
 import sys
 
 
@@ -13,12 +12,9 @@ def test_import_rgcc():
 
 def test_lazy_client_import():
     """Test that importing client_main doesn't load server deps."""
-    import sys
-
-    # Clear any previous imports
-    modules_before = set(sys.modules.keys())
-
     from rgcc import client_main
+
+    assert client_main is not None
 
     # Check server deps not loaded
     assert "starlette" not in sys.modules
@@ -28,9 +24,9 @@ def test_lazy_client_import():
 
 def test_lazy_server_import():
     """Test that importing server_main doesn't load client deps."""
-    import sys
-
     from rgcc import server_main
+
+    assert server_main is not None
 
     # Check client deps not loaded
     assert "rich" not in sys.modules
@@ -41,5 +37,7 @@ def test_lazy_server_import():
 def test_shared_imports():
     """Test that shared module loads without optional deps."""
     from rgcc.shared import checksum, config, crypto
+
+    assert checksum and config and crypto
 
     # These should work with only cryptography and PyYAML

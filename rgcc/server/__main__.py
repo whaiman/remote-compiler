@@ -4,7 +4,7 @@ import logging
 import uvicorn
 
 from rgcc import __version__
-from rgcc.server.api.app import app
+    
 from rgcc.shared.config import load_server_config
 
 
