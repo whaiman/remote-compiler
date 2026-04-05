@@ -87,8 +87,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - component: client
-            output: rgcc
           - component: server
             output: rgccd
 
@@ -122,11 +120,6 @@ jobs:
     needs: [release, build-binaries]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: rgcc-linux
-          path: ./binaries/
-
       - uses: actions/download-artifact@v4
         with:
           name: rgccd-linux

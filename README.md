@@ -56,16 +56,14 @@ pip install ".[client]"
 pip install ".[server]"
 ```
 
-### Option 3: Docker (Containerized)
+### Option 3: Docker (Build Node Only)
 
-The easiest way to run the software without modifying your local environment is via Docker.
+The easiest way to run the build server without modifying your local environment is via Docker.
 
 ```bash
-# Build both client and server Docker images locally
+# Build the server image locally
 make docker-build
 ```
-
-See the [Docker](#docker) section below for a full walkthrough.
 
 ---
 
@@ -106,11 +104,7 @@ compilers:
       win64:
         target: "x86_64-w64-mingw32"
         args: ["-static", "-fuse-ld=lld"]
-  # ... gcc / g++ toolchains ...
 ```
-
-> [!WARNING]
-> **Security Policy Constraint:** The server evaluates inbound compilation requests against an internal whitelist of compiler binaries (e.g., `gcc`, `clang`). Unrecognized toolchains passed by the client will implicitly fail payload execution to prevent Remote Code Execution (RCE).
 
 ---
 
@@ -130,13 +124,6 @@ Establish cryptographic trust by synchronizing the client to the build node:
 client:
   endpoint: http://192.168.1.50:4444
   auth_token: <paste-token-from-the-server-here>
-```
-
-**Or using Docker:**
-If you prefer not to install the CLI globally, you can use the containerized client:
-
-```bash
-make docker-run-client
 ```
 
 ### CLI Operations
@@ -208,26 +195,24 @@ All resultant compilation artifacts (`.out` / `.exe`, STDOUT logs, telemetry man
 
 ## Docker
 
-RGCC ships two separate Docker images: one for the **build server** and one for the **client CLI**. Both are built from the repository root using `Dockerfile.server` and `Dockerfile.client`.
+RGCC ships a Docker image for the **build server**. It is built from the repository root using `Dockerfile.server`.
 
 ### Images Overview
 
-| Image         | Dockerfile          | Entrypoint | Purpose                                                            |
-| ------------- | ------------------- | ---------- | ------------------------------------------------------------------ |
-| `rgcc-server` | `Dockerfile.server` | `rgccd`    | Runs the remote build daemon with GCC/Clang/MinGW pre-installed    |
-| `rgcc-client` | `Dockerfile.client` | `rgcc`     | Runs the CLI client without installing Python dependencies locally |
+| Image         | Dockerfile          | Entrypoint | Purpose                                                         |
+| ------------- | ------------------- | ---------- | --------------------------------------------------------------- |
+| `rgcc-server` | `Dockerfile.server` | `rgccd`    | Runs the remote build daemon with GCC/Clang/MinGW pre-installed |
 
 The server image uses a **multi-stage build**: dependencies are compiled in a `python:3.11-slim` builder stage and then copied into a clean runtime image that also installs `gcc`, `g++`, `clang`, and `mingw-w64` for cross-compilation.
 
-### Build Images
+### Build Image
 
 ```bash
-# Build both images at once
+# Build the image via Makefile
 make docker-build
 
-# Or build individually
+# Or build manually
 docker build -f Dockerfile.server -t rgcc-server:latest .
-docker build -f Dockerfile.client -t rgcc-client:latest .
 ```
 
 ### Run the Server
@@ -260,51 +245,17 @@ To view logs:
 docker logs -f rgcc-server
 ```
 
-### Run the Client
-
-> [!IMPORTANT]
-> Create your config from the example before running the container:
->
-> ```bash
-> cp config/client.config.yaml.example config/client.config.yaml
-> # Edit config/client.config.yaml - set endpoint and auth_token
-> ```
-
-```bash
-# Run via Makefile (compiles sample/main.cpp from the current directory)
-make docker-run-client
-
-# Or manually - mount your project as /workspace
-docker run --rm -it \
-  -v "$(pwd):/workspace" \
-  -v "$(pwd)/config:/workspace/config:ro" \
-  rgcc-client:latest \
-  compile /workspace/src/main.cpp
-
-# With explicit platform and standard overrides
-docker run --rm -it \
-  -v "$(pwd):/workspace" \
-  -v "$(pwd)/config:/workspace/config:ro" \
-  rgcc-client:latest \
-  compile /workspace/src/main.cpp --platform win64 --std c++20
-```
-
-Compilation artifacts will appear in `./dist/` on the host machine.
 
 ### Pull Pre-built Images from GHCR
 
 Pre-built images are published to GitHub Container Registry automatically on every push to `main` and on every version tag:
 
 ```bash
-# Server
+# Pull the latest server build
 docker pull ghcr.io/whaiman/remote-compiler-server:latest
-
-# Client
-docker pull ghcr.io/whaiman/remote-compiler-client:latest
 
 # Pin to a specific release
 docker pull ghcr.io/whaiman/remote-compiler-server:v2.0.0
-docker pull ghcr.io/whaiman/remote-compiler-client:v2.0.0
 ```
 
 ---
@@ -337,24 +288,9 @@ Quality:
   format            Run ruff format + ruff --fix
 
 Docker:
-  docker-build         Build rgcc-server and rgcc-client images
+  docker-build         Build rgcc-server image
   docker-run-server    Run server container (mounts config/)
-  docker-run-client    Run client container (mounts current directory)
   clean                Remove build artifacts and caches
-```
-
-### Useful one-liners
-
-```bash
-# Check installed versions
-rgcc -v
-rgccd -v
-
-# Server with CLI overrides (bypasses config file)
-rgccd --host 0.0.0.0 --port 8080
-
-# Server in dev mode (auto-reloads on code changes)
-rgccd --reload
 ```
 
 ---

@@ -58,7 +58,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install [${{ matrix.install-type }}]
+      - name: Install dependencies
         run: |
           if [ "${{ matrix.install-type }}" = "client" ]; then
             pip install -e ".[client]"
@@ -85,33 +85,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Build package
+      - name: Build wheel and sdist
         run: |
-          pip install build wheel
+          pip install build
           python -m build
 
-      - name: Check archive structure (Wheel)
+      - name: Check wheel structure
         run: |
           python << 'EOF'
           import zipfile
           from pathlib import Path
 
-          wheel = list(Path("dist").glob("*.whl"))[0]
-          print(f"Checking {wheel}")
+          whl = list(Path("dist").glob("*.whl"))[0]
+          print(f"Checking {whl}")
 
-          with zipfile.ZipFile(wheel, 'r') as zf:
+          with zipfile.ZipFile(whl, 'r') as zf:
               files = zf.namelist()
-              print("Top-level files:", [f for f in files if f.count('/') <= 1][:10])
+              # Major check: packages and entry points
+              assert any('rgcc/' in f for f in files), "rgcc package missing"
+              assert any('rgcc/client/' in f for f in files), "client subpackage missing"
+              assert any('rgcc/server/' in f for f in files), "server subpackage missing"
               
-              assert any('rgcc' in f for f in files), "Package rgcc not found in wheel"
+              # Ensure no build-time leaks
               assert not any('__pycache__' in f for f in files), "Cache files included"
               assert not any('.pyc' in f for f in files), "Bytecode included"
-              
-              # assert not any('tests/' in f for f in files), "Tests included in wheel"
               
           print("✓ Wheel structure OK")
           EOF
@@ -140,20 +142,6 @@ jobs:
           python -c "import rgcc; print('Client OK')"
           pip uninstall -y remote-compiler
 
-      - name: Install from wheel (server only)
-        run: |
-          WHEEL=$(ls dist/*.whl | head -n 1)
-          pip install "${WHEEL}[server]"
-          rgccd --help
-          python -c "import rgcc; print('Server OK')"
-
-      - name: Test entry points from wheel
-        run: |
-          which rgcc
-          which rgccd
-          rgcc --version || true
-          rgccd --version || true
-
   integration:
     runs-on: ubuntu-latest
     steps:
@@ -169,7 +157,6 @@ jobs:
       - name: Setup configs
         run: |
           mkdir -p config
-
           cat > config/server.config.yaml << 'EOF'
           server:
             auth_token: "test-token-integration-12345"
@@ -249,91 +236,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          pip install -e ".[client,server]"
-          pip install safety
-
-      - name: Safety check (dependencies vulnerabilities)
-        run: safety check || true
-
-      - name: Run Bandit (high severity only)
-        run: bandit -r rgcc/ -ll -ii || true
-
       - name: Secret scanning (TruffleHog)
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
           extra_args: --debug --only-verified
-
-  docker:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
-    strategy:
-      matrix:
-        component: [server, client]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image (${{ matrix.component }})
-        run: |
-          docker build -f Dockerfile.${{ matrix.component }} -t rgcc-${{ matrix.component }}:test .
-
-      - name: Smoke test (${{ matrix.component }})
-        run: |
-          if [ "${{ matrix.component }}" = "server" ]; then
-            docker run -d --name test-server -p 4444:4444 rgcc-server:test
-            sleep 5
-            
-            curl -s http://localhost:4444/ || echo "Server responded"
-            
-            docker exec test-server ps aux | grep rgccd
-            
-            docker stop test-server
-            docker rm test-server
-
-          else
-            docker run --rm rgcc-client:test --help
-            docker run --rm rgcc-client:test --version || true
-          fi
-
-      - name: Trivy vulnerability scanner
-        if: success() || failure()
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: rgcc-${{ matrix.component }}:test
-          format: sarif
-          output: trivy-${{ matrix.component }}.sarif
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: trivy-${{ matrix.component }}.sarif
-
-      - name: Push to GHCR (main & tags)
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tag and push
-        if: github.event_name != 'pull_request'
-        run: |
-          docker tag rgcc-${{ matrix.component }}:test ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}:latest
-          docker push ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}:latest

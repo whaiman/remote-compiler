@@ -1,4 +1,4 @@
-.PHONY: help install install-client install-server install-dev dev clean test lint format docker-build docker-run
+.PHONY: help install install-client install-server install-dev dev clean test lint format docker-build docker-run-server
 
 PYTHON := python3
 PIP := pip
@@ -24,7 +24,7 @@ help:
 	@echo "  format          Format code"
 	@echo ""
 	@echo "Docker:"
-	@echo "  docker-build    Build images locally"
+	@echo "  docker-build    Build server image locally"
 	@echo "  docker-run-server  Run server container"
 	@echo "  clean           Remove artifacts"
 
@@ -62,13 +62,9 @@ format:
 # Docker
 docker-build:
 	docker build -f Dockerfile.server -t $(IMAGE_PREFIX)-server:latest .
-	docker build -f Dockerfile.client -t $(IMAGE_PREFIX)-client:latest .
 
 docker-run-server:
 	docker run -p 4444:4444 -v $(PWD)/config/server.config.yaml:/app/config/server.config.yaml $(IMAGE_PREFIX)-server:latest
-
-docker-run-client:
-	docker run --rm -it -v $(PWD):/workspace $(IMAGE_PREFIX)-client:latest compile /workspace/sample/main.cpp
 
 clean:
 	rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache
