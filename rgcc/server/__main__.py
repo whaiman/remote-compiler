@@ -4,7 +4,7 @@ import logging
 import uvicorn
 
 from rgcc import __version__
-    
+
 from rgcc.shared.config import load_server_config
 
 
@@ -14,12 +14,15 @@ def main() -> None:
         description="RGCC Build Server Daemon",
     )
     parser.add_argument(
-        "--version", "-v",
+        "--version",
+        "-v",
         action="version",
         version=f"rgccd {__version__}",
     )
     parser.add_argument("--host", default=None, help="Override host from config")
-    parser.add_argument("--port", type=int, default=None, help="Override port from config")
+    parser.add_argument(
+        "--port", type=int, default=None, help="Override port from config"
+    )
     parser.add_argument(
         "--reload",
         action="store_true",

@@ -1,4 +1,5 @@
 """Basic smoke tests for RGCC package structure."""
+
 import sys
 
 

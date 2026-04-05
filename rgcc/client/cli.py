@@ -34,6 +34,7 @@ logger = logging.getLogger("rgcc")
 def _version_callback(value: bool) -> None:
     if value:
         from rgcc import __version__
+
         console.print(f"rgcc [bold cyan]{__version__}[/bold cyan]")
         raise typer.Exit()
 
@@ -42,7 +43,13 @@ def _version_callback(value: bool) -> None:
 def callback(
     version: Annotated[
         Optional[bool],
-        typer.Option("--version", "-v", help="Show version and exit.", callback=_version_callback, is_eager=True),
+        typer.Option(
+            "--version",
+            "-v",
+            help="Show version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
     ] = None,
 ) -> None:
     """RGCC - Remote GCC Compiler System."""
@@ -63,8 +70,28 @@ def _detect_standard(language: str) -> str:
 
 def _get_available_standards(language: str) -> list[str]:
     if language == "c":
-        return ["c89", "c90", "c99", "c11", "c17", "c23", "gnu99", "gnu11", "gnu17", "gnu23"]
-    return ["c++11", "c++14", "c++17", "c++20", "c++23", "gnu++17", "gnu++20", "gnu++23"]
+        return [
+            "c89",
+            "c90",
+            "c99",
+            "c11",
+            "c17",
+            "c23",
+            "gnu99",
+            "gnu11",
+            "gnu17",
+            "gnu23",
+        ]
+    return [
+        "c++11",
+        "c++14",
+        "c++17",
+        "c++20",
+        "c++23",
+        "gnu++17",
+        "gnu++20",
+        "gnu++23",
+    ]
 
 
 def _detect_compiler(entry_point: Path) -> str:
@@ -176,12 +203,12 @@ def _run_interactive(
         manifest.platform = _detect_platform()
 
     manifest.compiler = typer.prompt("Compiler executable", default=manifest.compiler)
-    
+
     standards = _get_available_standards(manifest.language)
     manifest.standard = typer.prompt(
         f"Language standard ({', '.join(standards)})", default=manifest.standard
     )
-    
+
     manifest.platform = typer.prompt("Target platform", default=manifest.platform)
     manifest.output = typer.prompt("Output binary name", default=manifest.output)
     manifest.out_dir = typer.prompt("Artifacts directory", default=manifest.out_dir)
@@ -295,7 +322,9 @@ def compile(
     compile_only: bool = typer.Option(
         False, "--compile-only", help="Compile only, don't link"
     ),
-    standard: Optional[str] = typer.Option(None, "--std", help="Language standard (auto-detected if omitted)"),
+    standard: Optional[str] = typer.Option(
+        None, "--std", help="Language standard (auto-detected if omitted)"
+    ),
     platform: Optional[str] = typer.Option(
         None, "--platform", help="Target platform (linux, win64, darwin)"
     ),

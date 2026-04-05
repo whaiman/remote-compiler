@@ -32,7 +32,9 @@ def generate_build_manifest(
     if rel_entry not in rel_sources:
         rel_sources.append(rel_entry)
 
-    include_dirs = sorted({s.parent.relative_to(project_root).as_posix() for s in sources})
+    include_dirs = sorted(
+        {s.parent.relative_to(project_root).as_posix() for s in sources}
+    )
 
     return BuildManifest(
         language=language,

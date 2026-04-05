@@ -46,7 +46,7 @@ def resolve_includes(
                 inc_path = candidate
             else:
                 # 3. Search extra -I directories (e.g. "include/")
-                for inc_dir in (extra_include_dirs or []):
+                for inc_dir in extra_include_dirs or []:
                     candidate = (inc_dir / match).resolve()
                     if candidate.exists() and candidate.is_relative_to(base_dir):
                         inc_path = candidate
@@ -64,7 +64,9 @@ def resolve_includes(
             for src_ext in {".cpp", ".c", ".cc", ".cxx"}:
                 src_path = inc_path.with_suffix(src_ext)
                 if src_path.exists() and src_path not in processed_files:
-                    resolve_includes(src_path, base_dir, processed_files, extra_include_dirs)
+                    resolve_includes(
+                        src_path, base_dir, processed_files, extra_include_dirs
+                    )
 
     return processed_files
 

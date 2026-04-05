@@ -79,8 +79,9 @@ jobs:
 
           sleep 5
 
+          docker logs test-server
+
           docker ps | grep test-server
-          docker logs test-server | head -20
 
           docker exec test-server sh -c "netstat -tlnp 2>/dev/null || ss -tlnp" || true
 

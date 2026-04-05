@@ -23,11 +23,18 @@ class CompilationResult:
     output_path: Optional[Path] = None
 
 
-def _build_command(manifest: BuildManifest, src_dir: Path, output_path: Path, config: dict) -> list[str]:
+def _build_command(
+    manifest: BuildManifest, src_dir: Path, output_path: Path, config: dict
+) -> list[str]:
     """Assemble the compiler command from manifest + server config."""
     compilers_cfg = config.get("compilers", {})
-    if manifest.compiler not in compilers_cfg and manifest.compiler not in ALLOWED_COMPILERS:
-        raise ValueError(f"Compiler '{manifest.compiler}' is not allowed on this server.")
+    if (
+        manifest.compiler not in compilers_cfg
+        and manifest.compiler not in ALLOWED_COMPILERS
+    ):
+        raise ValueError(
+            f"Compiler '{manifest.compiler}' is not allowed on this server."
+        )
 
     compiler_cfg = compilers_cfg.get(manifest.compiler, {})
     platform_cfg = compiler_cfg.get("platforms", {}).get(manifest.platform, {})
@@ -77,7 +84,9 @@ def _build_command(manifest: BuildManifest, src_dir: Path, output_path: Path, co
     return cmd
 
 
-def run_compilation(manifest: BuildManifest, working_dir: Path, config: dict = None) -> CompilationResult:
+def run_compilation(
+    manifest: BuildManifest, working_dir: Path, config: dict = None
+) -> CompilationResult:
     """Run a compilation task based on a manifest."""
     config = config or {}
     src_dir = working_dir / "src"
@@ -96,7 +105,9 @@ def run_compilation(manifest: BuildManifest, working_dir: Path, config: dict = N
 
     start = time.time()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=src_dir)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, cwd=src_dir
+        )
         return CompilationResult(
             returncode=proc.returncode,
             stdout=proc.stdout,

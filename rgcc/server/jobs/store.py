@@ -10,17 +10,14 @@ class JobInfo:
     manifest_result: dict
     logs: str = ""
 
+
 class JobStore:
     def __init__(self):
         self.jobs: Dict[str, JobInfo] = {}
 
     def create_job(self) -> str:
         job_id = str(uuid.uuid4())
-        self.jobs[job_id] = JobInfo(
-            id=job_id,
-            status="pending",
-            manifest_result={}
-        )
+        self.jobs[job_id] = JobInfo(id=job_id, status="pending", manifest_result={})
         return job_id
 
     def update_job(self, job_id: str, status: str, manifest_result: dict, logs: str):
@@ -31,6 +28,7 @@ class JobStore:
 
     def get_job(self, job_id: str) -> Optional[JobInfo]:
         return self.jobs.get(job_id)
+
 
 # Singleton global job store
 job_store = JobStore()

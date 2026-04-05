@@ -33,7 +33,9 @@ class BuildManifest:
 
     def save_config(self, path: Path) -> None:
         """Save only persistent (non-transient) fields to a JSON file."""
-        config_data = {k: v for k, v in self.__dict__.items() if k not in TRANSIENT_FIELDS}
+        config_data = {
+            k: v for k, v in self.__dict__.items() if k not in TRANSIENT_FIELDS
+        }
         with open(path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2)
 
