@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    outputs:
+      release_body: ${{ steps.git-cliff.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: git-cliff
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGES.md
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGES.md
+
+  release:
+    needs: changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: CHANGES.md
+          generate_release_notes: false
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+      - name: Update CHANGELOG.md in repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Get current main
+          git fetch origin main
+          git checkout main
+
+          # Add the new changelog to the beginning of the existing one, or create a new one
+          if [ -f CHANGELOG.md ]; then
+            cat CHANGES.md > NEW_CHANGELOG.md
+            echo "" >> NEW_CHANGELOG.md
+            tail -n +2 CHANGELOG.md >> NEW_CHANGELOG.md
+          else
+            cat CHANGES.md > NEW_CHANGELOG.md
+          fi
+
+          mv NEW_CHANGELOG.md CHANGELOG.md
+
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}" || echo "No changes to commit"
+
+          # Push with conflict resolution (if main has advanced)
+          git pull origin main --rebase || true
+          git push origin main || echo "Push failed, may need manual update"
+
+  build-binaries:
+    needs: changelog
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - component: client
+            output: rgcc
+          - component: server
+            output: rgccd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -e ".[${{ matrix.component }}]"
+
+      - name: Build binary with PyInstaller
+        run: |
+          # Создаем временный spec файл или используем прямую команду
+          pyinstaller --onefile --name ${{ matrix.output }} \
+            --hidden-import=rgcc.${{ matrix.component }} \
+            rgcc/${{ matrix.component }}/__main__.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}-linux
+          path: dist/${{ matrix.output }}
+
+  # Optional: Create a Release with binaries
+  upload-assets:
+    needs: [release, build-binaries]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rgcc-linux
+          path: ./binaries/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rgccd-linux
+          path: ./binaries/
+
+      - name: Upload binaries to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./binaries/*
+          tag_name: ${{ github.ref_name }}

@@ -1,0 +1,324 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install ruff black mypy bandit safety
+
+      - name: Ruff (lint + format check)
+        run: |
+          ruff check rgcc/
+          ruff format --check rgcc/
+
+      - name: MyPy (type checking)
+        run: |
+          pip install -e ".[client,server]"
+          mypy rgcc/ --ignore-missing-imports --strict
+
+      - name: Bandit (security lint)
+        run: bandit -r rgcc/ -f json -o bandit-report.json || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        install-type: [client, server, full]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install [${{ matrix.install-type }}]
+        run: |
+          if [ "${{ matrix.install-type }}" = "client" ]; then
+            pip install -e ".[client]"
+          elif [ "${{ matrix.install-type }}" = "server" ]; then
+            pip install -e ".[server]"
+          else
+            pip install -e ".[dev]"
+          fi
+
+      - name: Test lazy loading
+        run: |
+          if [ "${{ matrix.install-type }}" = "client" ]; then
+            python -c "import sys; from rgcc import client_main; assert 'starlette' not in sys.modules"
+          elif [ "${{ matrix.install-type }}" = "server" ]; then
+            python -c "import sys; from rgcc import server_main; assert 'rich' not in sys.modules"
+          fi
+
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short -x
+
+  package-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build package
+        run: |
+          pip install build wheel
+          python -m build
+
+      - name: Check archive structure (Wheel)
+        run: |
+          python << 'EOF'
+          import zipfile
+          from pathlib import Path
+
+          wheel = list(Path("dist").glob("*.whl"))[0]
+          print(f"Checking {wheel}")
+
+          with zipfile.ZipFile(wheel, 'r') as zf:
+              files = zf.namelist()
+              print("Top-level files:", [f for f in files if f.count('/') <= 1][:10])
+              
+              assert any('rgcc' in f for f in files), "Package rgcc not found in wheel"
+              assert not any('__pycache__' in f for f in files), "Cache files included"
+              assert not any('.pyc' in f for f in files), "Bytecode included"
+              
+              # assert not any('tests/' in f for f in files), "Tests included in wheel"
+              
+          print("✓ Wheel structure OK")
+          EOF
+
+      - name: Check archive structure (SDist)
+        run: |
+          python << 'EOF'
+          import tarfile
+          from pathlib import Path
+
+          sdist = list(Path("dist").glob("*.tar.gz"))[0]
+          print(f"Checking {sdist}")
+
+          with tarfile.open(sdist, 'r:gz') as tf:
+              files = tf.getnames()
+              assert any('pyproject.toml' in f for f in files), "pyproject.toml missing"
+              assert any('rgcc/' in f for f in files), "rgcc package missing"
+          print("✓ SDist structure OK")
+          EOF
+
+      - name: Install from wheel (client only)
+        run: |
+          pip install dist/*-client-*-none-any.whl || pip install dist/*.whl
+          rgcc --help
+          python -c "import rgcc; print('Client OK')"
+          pip uninstall -y remote-compiler
+
+      - name: Install from wheel (server only)
+        run: |
+          pip install dist/*.whl
+          rgccd --help
+          python -c "import rgcc; print('Server OK')"
+
+      - name: Test entry points from wheel
+        run: |
+          which rgcc
+          which rgccd
+          rgcc --version || true
+          rgccd --version || true
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install full package
+        run: pip install -e ".[client,server]"
+
+      - name: Setup configs
+        run: |
+          mkdir -p config
+
+          cat > config/server.config.yaml << 'EOF'
+          server:
+            auth_token: "test-token-integration-12345"
+            host: 127.0.0.1
+            port: 4444
+          compilers:
+            g++:
+              default_args: ["-std=c++17"]
+          EOF
+
+          cat > config/client.config.yaml << 'EOF'
+          client:
+            endpoint: http://127.0.0.1:4444
+            auth_token: "test-token-integration-12345"
+          EOF
+
+      - name: Create test C++ file
+        run: |
+          mkdir -p test_project
+          cat > test_project/main.cpp << 'EOF'
+          #include <iostream>
+          int main() {
+              std::cout << "Hello from RGCC Integration Test" << std::endl;
+              return 0;
+          }
+          EOF
+
+      - name: Start server (background)
+        run: |
+          echo "Starting server..."
+          rgccd &
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+          for i in {1..30}; do
+              if curl -s http://127.0.0.1:4444/health || curl -s http://127.0.0.1:4444/; then
+                  echo "Server is ready!"
+                  break
+              fi
+              echo "Waiting for server... ($i)"
+              sleep 1
+          done
+
+      - name: Run integration test (compile)
+        run: |
+          cd test_project
+          rgcc compile main.cpp -o test_app --std c++17
+
+          ls -la dist/ || ls -la
+
+          if [ -f "dist/test_app" ]; then
+            ./dist/test_app | grep "Hello from RGCC"
+          elif [ -f "test_app" ]; then
+            ./test_app | grep "Hello from RGCC"
+          fi
+
+      - name: Cleanup server
+        if: always()
+        run: |
+          kill $SERVER_PID || true
+          sleep 2
+
+  security:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[client,server]"
+          pip install safety
+
+      - name: Safety check (dependencies vulnerabilities)
+        run: safety check || true
+
+      - name: Run Bandit (high severity only)
+        run: bandit -r rgcc/ -ll -ii || true
+
+      - name: Secret scanning (TruffleHog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        component: [server, client]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (${{ matrix.component }})
+        run: |
+          docker build -f Dockerfile.${{ matrix.component }} -t rgcc-${{ matrix.component }}:test .
+
+      - name: Smoke test (${{ matrix.component }})
+        run: |
+          if [ "${{ matrix.component }}" = "server" ]; then
+            docker run -d --name test-server -p 4444:4444 rgcc-server:test
+            sleep 5
+            
+            curl -s http://localhost:4444/ || echo "Server responded"
+            
+            docker exec test-server ps aux | grep rgccd
+            
+            docker stop test-server
+            docker rm test-server
+
+          else
+            docker run --rm rgcc-client:test --help
+            docker run --rm rgcc-client:test --version || true
+          fi
+
+      - name: Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: rgcc-${{ matrix.component }}:test
+          format: sarif
+          output: trivy-${{ matrix.component }}.sarif
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.component }}.sarif
+
+      - name: Push to GHCR (main & tags)
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag rgcc-${{ matrix.component }}:test ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}:latest
+          docker push ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}:latest

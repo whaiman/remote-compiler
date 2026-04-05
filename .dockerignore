@@ -1,0 +1,66 @@
+# Ignore
+# Git
+
+.git
+.github
+.gitignore
+
+# Python
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test/Coverage
+
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+tests/
+test*_
+
+# IDE
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Configs with secrets (CRITICAL!)
+
+config/
+*_config.yaml
+*_config.yml
+server_config.yaml
+client_config.yaml
+
+# Docs
+
+*.md
+!README.md
+CHANGELOG.md
+LICENSE
+
+# Build artifacts
+
+build/
+dist/
+*.egg-info/

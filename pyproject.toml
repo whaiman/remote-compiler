@@ -1,12 +1,14 @@
 [project]
 name = "remote-compiler"
-version = "0.1.0"
-description = "Remote C/C++ Compiler System"
+version = "2.0.0"
+description = "Remote GCC Compiler System"
 authors = [{name = "whaiman"}]
 dependencies = [
-    "cryptography",
-    "pyyaml"
+    "cryptography>=44.0.0",
+    "PyYAML>=6.0",
 ]
+readme = "README.md"
+license = {text = "AGPL-3.0"}
 
 [project.optional-dependencies]
 client = [
@@ -19,15 +21,24 @@ server = [
     "uvicorn",
     "python-multipart"
 ]
+dev = [
+    "remote-compiler[client,server]",
+    "pytest>=7.0",
+    "pytest-asyncio",
+    "pytest-cov",
+    "mypy",
+    "bandit",
+    "safety",
+]
 
 [project.scripts]
-rgcc = "client.cli:app"
-rgcc-server = "server.__main__:main"
+rgcc = "rgcc:client_main"
+rgccd = "rgcc:server_main"
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["*"]
+include = ["rgcc"]

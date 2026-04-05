@@ -1,0 +1,118 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: rgcc
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [server, client]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Login to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.component }}
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test (Server)
+        if: matrix.component == 'server'
+        run: |
+          mkdir -p config
+          echo 'server:' > config/server.config.yaml
+          echo '  auth_token: "test-docker-token"' >> config/server.config.yaml
+          echo '  host: 0.0.0.0' >> config/server.config.yaml
+          echo '  port: 4444' >> config/server.config.yaml
+
+          docker run -d --name test-server \
+            -v $(pwd)/config:/app/config:ro \
+            -p 4444:4444 \
+            ${{ env.IMAGE_PREFIX }}-server:test
+
+          sleep 5
+
+          docker ps | grep test-server
+          docker logs test-server | head -20
+
+          docker exec test-server sh -c "netstat -tlnp 2>/dev/null || ss -tlnp" || true
+
+          docker stop test-server
+          docker rm test-server
+
+      - name: Smoke test (Client)
+        if: matrix.component == 'client'
+        run: |
+          docker run --rm ${{ env.IMAGE_PREFIX }}-client:test --help
+
+          docker run --rm ${{ env.IMAGE_PREFIX }}-client:test --version || true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:test
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Push image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.component }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

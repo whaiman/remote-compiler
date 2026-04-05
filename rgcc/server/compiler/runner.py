@@ -96,7 +96,7 @@ def run_compilation(manifest: BuildManifest, working_dir: Path, config: dict = N
 
     start = time.time()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=src_dir)
         return CompilationResult(
             returncode=proc.returncode,
             stdout=proc.stdout,

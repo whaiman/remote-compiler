@@ -1,0 +1,16 @@
+# Client UI stage
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY rgcc/ ./rgcc/
+
+RUN pip install --user --no-cache-dir ".[client]"
+
+FROM python:3.11-slim
+
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+ENTRYPOINT ["rgcc"]
