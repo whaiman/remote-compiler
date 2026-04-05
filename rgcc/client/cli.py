@@ -14,13 +14,13 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from client.collect import collect_sources
-from client.manifest import generate_build_manifest
-from client.transport.api import ApiClient
-from shared.checksum import get_sha256
-from shared.config import load_client_config
-from shared.manifest import SOURCE_EXTENSIONS, BuildManifest
-from shared.platforms import PLATFORM_MAP
+from rgcc.client.collect import collect_sources
+from rgcc.client.manifest import generate_build_manifest
+from rgcc.client.transport.api import ApiClient
+from rgcc.shared.checksum import get_sha256
+from rgcc.shared.config import load_client_config
+from rgcc.shared.manifest import SOURCE_EXTENSIONS, BuildManifest
+from rgcc.shared.platforms import PLATFORM_MAP
 
 app = typer.Typer(name="rgcc", help="Remote GCC Compiler Client")
 console = Console()

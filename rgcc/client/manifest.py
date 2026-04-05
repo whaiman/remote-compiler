@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from shared.checksum import get_sha256
-from shared.manifest import BuildManifest, SOURCE_EXTENSIONS
+from rgcc.shared.checksum import get_sha256
+from rgcc.shared.manifest import BuildManifest, SOURCE_EXTENSIONS
 
 
 def generate_build_manifest(

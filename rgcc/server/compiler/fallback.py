@@ -3,7 +3,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from server.compiler.runner import CompilationResult
+from rgcc.server.compiler.runner import CompilationResult
 
 logger = logging.getLogger("server.compiler.fallback")
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import httpx
 
-from shared.crypto import (
+from rgcc.shared.crypto import (
     compute_shared_key,
     decrypt_payload,
     encrypt_payload,

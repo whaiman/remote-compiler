@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from shared.manifest import BuildManifest
-from shared.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
+from rgcc.shared.manifest import BuildManifest
+from rgcc.shared.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
 
 logger = logging.getLogger("server.compiler")
 
