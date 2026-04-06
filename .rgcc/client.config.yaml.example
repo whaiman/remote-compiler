@@ -1,6 +1,0 @@
-client:
-  # The auth token must match the one provided in server.config.yaml
-  auth_token: "CHANGE_ME_SECRET_TOKEN"
-  
-  # Endpoint of the server running rgccd
-  endpoint: http://127.0.0.1:4444
