@@ -1,8 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
-from typing import List
+from typing import Any, List, Optional
 
 TRANSIENT_FIELDS = {"timestamp", "checksum_sha256", "sources", "include_dirs"}
 
@@ -11,7 +10,7 @@ SOURCE_EXTENSIONS = {".cpp", ".c", ".cc", ".cxx", ".cp", ".c++"}
 
 @dataclass
 class BuildManifest:
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     language: str = "c++"
     standard: str = "c++23"
     entry_point: str = "src/main.cpp"
@@ -23,6 +22,8 @@ class BuildManifest:
     output: str = "a.out"
     compiler: str = "g++"
     platform: str = "linux"
+    target: Optional[str] = None
+    sysroot: Optional[str] = None
     out_dir: str = "dist"
     save_logs: bool = True
     save_manifest: bool = True

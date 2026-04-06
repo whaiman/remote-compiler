@@ -4,9 +4,9 @@ from typing import Any
 
 import yaml  # type: ignore
 
-# We explicitly place config files inside a local config/ directory
-SERVER_CONFIG_PATH = Path.cwd() / ".rgcc" / "server.config.yaml"
-CLIENT_CONFIG_PATH = Path.cwd() / ".rgcc" / "client.config.yaml"
+# We use per-project configuration files by default
+SERVER_CONFIG_PATH = Path.cwd() / "rgccd.yaml"
+CLIENT_CONFIG_PATH = Path.cwd() / "rgcc.yaml"
 
 
 def load_server_config() -> dict[str, Any]:
