@@ -21,6 +21,8 @@ from rgcc.core.checksum import get_sha256
 from rgcc.core.config import load_client_config
 from rgcc.core.manifest import SOURCE_EXTENSIONS, BuildManifest
 from rgcc.core.platforms import PLATFORM_MAP
+from rgcc.core.security import safe_extract
+
 
 app = typer.Typer(name="rgcc", help="Remote GCC Compiler Client")
 console = Console()
@@ -94,6 +96,24 @@ def _get_available_standards(language: str) -> list[str]:
     ]
 
 
+def complete_platform(incomplete: str):
+    platforms = ["linux", "win64", "darwin"]
+    return [p for p in platforms if p.startswith(incomplete)]
+
+
+def complete_standard(ctx: typer.Context, incomplete: str):
+    # Try to find entry_point in params
+    entry_point = ctx.params.get("entry_point")
+    language = "c++"
+    if entry_point:
+        path = Path(entry_point)
+        if path.suffix.lower() == ".c":
+            language = "c"
+
+    standards = _get_available_standards(language)
+    return [s for s in standards if s.startswith(incomplete)]
+
+
 def _detect_compiler(entry_point: Path) -> str:
     return "g++" if _detect_language(entry_point) == "c++" else "gcc"
 
@@ -146,6 +166,8 @@ def _apply_cli_overrides(
     *,
     entry_point: Path,
     platform: Optional[str],
+    target: Optional[str],
+    sysroot: Optional[str],
     output: Optional[str],
     standard: Optional[str],
     compile_only: bool,
@@ -161,6 +183,10 @@ def _apply_cli_overrides(
     """
     if platform:
         manifest.platform = platform
+    if target:
+        manifest.target = target
+    if sysroot:
+        manifest.sysroot = sysroot
     if output:
         manifest.output = output
 
@@ -329,10 +355,22 @@ def compile(
         False, "--compile-only", help="Compile only, don't link"
     ),
     standard: Optional[str] = typer.Option(
-        None, "--std", help="Language standard (auto-detected if omitted)"
+        None,
+        "--std",
+        help="Language standard (auto-detected if omitted)",
+        autocompletion=complete_standard,
     ),
     platform: Optional[str] = typer.Option(
-        None, "--platform", help="Target platform (linux, win64, darwin)"
+        None,
+        "--platform",
+        help="Target platform (linux, win64, darwin)",
+        autocompletion=complete_platform,
+    ),
+    target: Optional[str] = typer.Option(
+        None, "--target", help="Compilation target triple (e.g. aarch64-linux-gnu)"
+    ),
+    sysroot: Optional[str] = typer.Option(
+        None, "--sysroot", help="Path to remote sysroot (if required)"
     ),
     interactive: bool = typer.Option(
         False, "--interactive", "-i", help="Prompt for build settings before starting"
@@ -351,6 +389,8 @@ def compile(
     if not entry_point.exists():
         console.print(f"[bold red]Error:[/bold red] File {entry_point} not found.")
         raise typer.Exit(1)
+
+    console.print(f"📡 Remote Compiler: Preparing [cyan]{entry_point.name}[/cyan]...")
 
     entry_point = entry_point.resolve()
     project_root = _resolve_project_root(entry_point)
@@ -376,6 +416,8 @@ def compile(
             compiler=_detect_compiler(entry_point),
             standard=standard or _detect_standard(_detect_language(entry_point)),
             platform=detected_platform,
+            target=target,
+            sysroot=sysroot,
             flags=flags,
             out_dir=str(out_dir),
             save_logs=save_logs,
@@ -386,6 +428,8 @@ def compile(
             manifest,
             entry_point=entry_point,
             platform=platform,
+            target=target,
+            sysroot=sysroot,
             output=output,
             standard=standard,
             compile_only=compile_only,
@@ -421,10 +465,11 @@ def compile(
             api_ep = endpoint or cfg.get("endpoint")
             api_token = cfg.get("auth_token")
 
-            if not api_ep or not api_token:
+            if not api_ep or not api_token or "CHANGE_ME" in str(api_ep) or "PASTE_TOKEN" in str(api_token):
                 console.print(
-                    "[bold red]Error:[/bold red] Missing configuration (endpoint or auth_token) in client_config.yaml."
+                    "\n[bold red]Error:[/bold red] Missing or invalid configuration in [cyan]rgcc.yaml[/cyan]."
                 )
+                console.print("Please edit [cyan]rgcc.yaml[/cyan] and set your server [bold yellow]endpoint[/bold yellow] and [bold yellow]auth_token[/bold yellow].")
                 raise typer.Exit(1)
 
             api_client = ApiClient(api_ep, api_token)
@@ -439,7 +484,7 @@ def compile(
             out_dist = Path(manifest.out_dir)
             out_dist.mkdir(exist_ok=True, parents=True)
             with tarfile.open(result_archive_path, "r:gz") as tar:
-                tar.extractall(path=out_dist)
+                safe_extract(tar, out_dist)
 
             _print_result(out_dist)
             _cleanup_artifacts(out_dist, manifest)
