@@ -6,18 +6,23 @@ authors = [{name = "whaiman"}]
 dependencies = [
     "cryptography>=44.0.0",
     "PyYAML>=6.0",
+    "httpx",
+    "typer",
+    "rich",
+    "starlette",
+    "uvicorn",
+    "python-multipart",
 ]
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 
+[project.scripts]
+rgcc = "rgcc.client.cli:app"
+rgccd = "rgcc.server.__main__:main"
 
 [project.optional-dependencies]
-client = ["httpx", "typer[all]", "rich"]
-server = ["starlette", "uvicorn", "python-multipart"]
-dev    = [
-    "httpx", "typer[all]", "rich",
-    "starlette", "uvicorn", "python-multipart",
-    "pytest", "ruff", "black",
+dev = [
+    "pytest", "ruff", "black"
 ]
 
 [build-system]
