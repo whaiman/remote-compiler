@@ -17,10 +17,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rgcc.client.collect import collect_sources
 from rgcc.client.manifest import generate_build_manifest
 from rgcc.client.transport.api import ApiClient
-from rgcc.shared.checksum import get_sha256
-from rgcc.shared.config import load_client_config
-from rgcc.shared.manifest import SOURCE_EXTENSIONS, BuildManifest
-from rgcc.shared.platforms import PLATFORM_MAP
+from rgcc.core.checksum import get_sha256
+from rgcc.core.config import load_client_config
+from rgcc.core.manifest import SOURCE_EXTENSIONS, BuildManifest
+from rgcc.core.platforms import PLATFORM_MAP
 
 app = typer.Typer(name="rgcc", help="Remote GCC Compiler Client")
 console = Console()
@@ -39,7 +39,7 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback()  # type: ignore[untyped-decorator]
 def callback(
     version: Annotated[
         Optional[bool],
@@ -169,12 +169,12 @@ def _apply_cli_overrides(
         # Explicit CLI value always wins.
         manifest.standard = standard
     elif manifest.standard in ("c++17", "c++23", "c11", "c17"):
-        # Looks like a dataclass default — re-derive from the actual language.
+        # Looks like a dataclass default - re-derive from the actual language.
         manifest.standard = _detect_standard(manifest.language)
 
     # --- compiler ---
     if manifest.compiler in ("g++", "gcc"):
-        # Dataclass default — re-derive from the entry point language.
+        # Dataclass default - re-derive from the entry point language.
         manifest.compiler = _detect_compiler(entry_point)
 
     if compile_only and "-c" not in manifest.flags:
@@ -315,7 +315,7 @@ def _cleanup_artifacts(out_dist: Path, manifest: BuildManifest) -> None:
 # ─── Commands ──────────────────────────────────────────────────────────────────
 
 
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def compile(
     entry_point: Path = typer.Argument(..., help="Main .c / .cpp file"),
     output: Optional[str] = typer.Option(
@@ -448,7 +448,7 @@ def compile(
             shutil.rmtree(work_dir, ignore_errors=True)
 
 
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def init(
     entry_point: Path = typer.Argument(..., help="Main .c / .cpp file"),
     output: Optional[str] = typer.Option(

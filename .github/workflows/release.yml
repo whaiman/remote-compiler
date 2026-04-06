@@ -59,11 +59,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Get current main
           git fetch origin main
           git checkout main
 
-          # Add the new changelog to the beginning of the existing one, or create a new one
           if [ -f CHANGELOG.md ]; then
             cat CHANGES.md > NEW_CHANGELOG.md
             echo "" >> NEW_CHANGELOG.md
@@ -73,11 +71,8 @@ jobs:
           fi
 
           mv NEW_CHANGELOG.md CHANGELOG.md
-
           git add CHANGELOG.md
           git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}" || echo "No changes to commit"
-
-          # Push with conflict resolution (if main has advanced)
           git pull origin main --rebase || true
           git push origin main || echo "Push failed, may need manual update"
 
@@ -87,8 +82,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - component: server
+          - package: rgcc-server
             output: rgccd
+            entrypoint: rgcc/server/__main__.py
 
     steps:
       - uses: actions/checkout@v4
@@ -100,14 +96,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller
-          pip install -e ".[${{ matrix.component }}]"
+          pip install -e packages/${{ matrix.package }}
 
       - name: Build binary with PyInstaller
         run: |
-          # Создаем временный spec файл или используем прямую команду
           pyinstaller --onefile --name ${{ matrix.output }} \
-            --hidden-import=rgcc.${{ matrix.component }} \
-            rgcc/${{ matrix.component }}/__main__.py
+            --hidden-import=rgcc.server \
+            --hidden-import=rgcc.core \
+            ${{ matrix.entrypoint }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -115,7 +111,6 @@ jobs:
           name: ${{ matrix.output }}-linux
           path: dist/${{ matrix.output }}
 
-  # Optional: Create a Release with binaries
   upload-assets:
     needs: [release, build-binaries]
     runs-on: ubuntu-latest

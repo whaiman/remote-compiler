@@ -30,6 +30,15 @@ def test_server_is_lazy():
     print("✓ Server lazy loading OK")
 
 
+def test_core_imports():
+    """Verify that core shared modules can be imported."""
+    print("Testing core imports...")
+    from rgcc.core import checksum, config, crypto, manifest, platforms
+
+    assert all([checksum, config, crypto, manifest, platforms])
+    print("✓ Core imports OK")
+
+
 if __name__ == "__main__":
     test_client_is_lazy()
     test_server_is_lazy()

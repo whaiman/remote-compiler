@@ -197,5 +197,5 @@ spec.md
 build.json
 code_review.md
 server.log
-config/*.yaml
+.rgcc/*.yaml
 logs_*

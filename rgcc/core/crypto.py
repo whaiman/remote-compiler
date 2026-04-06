@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, cast
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -16,7 +16,7 @@ def derive_key(password: str, salt: bytes) -> bytes:
         salt=salt,
         iterations=100000,
     )
-    return kdf.derive(password.encode())
+    return cast(bytes, kdf.derive(password.encode()))
 
 
 def generate_ec_keypair() -> tuple[Any, str]:
@@ -27,7 +27,7 @@ def generate_ec_keypair() -> tuple[Any, str]:
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    return private_key, pub_bytes.decode("utf-8")
+    return private_key, cast(str, pub_bytes.decode("utf-8"))
 
 
 def compute_shared_key(private_key: Any, peer_public_pem: str, auth_token: str) -> str:
@@ -43,7 +43,7 @@ def compute_shared_key(private_key: Any, peer_public_pem: str, auth_token: str) 
         info=b"handshake_" + auth_token.encode("utf-8"),
     )
     aes_key = hkdf.derive(shared_key)
-    return aes_key.hex()
+    return cast(str, aes_key.hex())
 
 
 def encrypt_payload(data: bytes, key_hex: str) -> bytes:
@@ -57,7 +57,7 @@ def encrypt_payload(data: bytes, key_hex: str) -> bytes:
     aesgcm = AESGCM(key)
     nonce = os.urandom(12)
     ciphertext = aesgcm.encrypt(nonce, data, None)
-    return nonce + ciphertext
+    return cast(bytes, nonce + ciphertext)
 
 
 def decrypt_payload(payload: bytes, key_hex: str) -> bytes:
@@ -66,4 +66,4 @@ def decrypt_payload(payload: bytes, key_hex: str) -> bytes:
     aesgcm = AESGCM(key)
     nonce = payload[:12]
     ciphertext = payload[12:]
-    return aesgcm.decrypt(nonce, ciphertext, None)
+    return cast(bytes, aesgcm.decrypt(nonce, ciphertext, None))

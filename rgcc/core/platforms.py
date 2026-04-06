@@ -1,5 +1,5 @@
 # Canonical mapping from platform.system() to internal platform tags.
-# Add new platforms here — one place for both client and server.
+# Add new platforms here - one place for both client and server.
 PLATFORM_MAP: dict[str, str] = {
     "windows": "win64",
     "linux": "linux",

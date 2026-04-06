@@ -15,17 +15,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from rgcc.server.compiler.fallback import run_fallback_compilation
-from rgcc.server.compiler.runner import run_compilation
-from rgcc.server.jobs.store import job_store
-from rgcc.shared.config import load_server_config
-from rgcc.shared.crypto import (
+from rgcc.core.config import load_server_config
+from rgcc.core.crypto import (
     compute_shared_key,
     decrypt_payload,
     encrypt_payload,
     generate_ec_keypair,
 )
-from rgcc.shared.manifest import BuildManifest
+from rgcc.core.manifest import BuildManifest
+from rgcc.server.compiler.fallback import run_fallback_compilation
+from rgcc.server.compiler.runner import run_compilation
+from rgcc.server.jobs.store import job_store
 
 # 1. Initialize App and Logger first so we can use them
 logger = logging.getLogger("rgcc")

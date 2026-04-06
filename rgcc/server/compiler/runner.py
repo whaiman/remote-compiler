@@ -4,10 +4,10 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
-from rgcc.shared.manifest import BuildManifest
-from rgcc.shared.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
+from rgcc.core.manifest import BuildManifest
+from rgcc.core.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
 
 logger = logging.getLogger("server.compiler")
 

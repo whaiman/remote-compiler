@@ -1,10 +1,10 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import httpx
 
-from rgcc.shared.crypto import (
+from rgcc.core.crypto import (
     compute_shared_key,
     decrypt_payload,
     encrypt_payload,
@@ -94,7 +94,7 @@ class ApiClient:
                 raise RuntimeError(f"Server returned {response.status_code}: {detail}")
 
             # Response is encrypted
-            return response.content
+            return cast(bytes, response.content)
 
     async def decrypt_response(self, response_payload: bytes) -> bytes:
         """Decrypt the server response."""

@@ -44,13 +44,9 @@ test*_
 *.swo
 *~
 
-# Configs with secrets (CRITICAL!)
+# Configs with secrets
 
-config/
-*_config.yaml
-*_config.yml
-server_config.yaml
-client_config.yaml
+.rgcc/
 
 # Docs
 

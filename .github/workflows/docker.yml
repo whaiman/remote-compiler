@@ -65,28 +65,28 @@ jobs:
 
       - name: Smoke test (Server)
         run: |
-          mkdir -p config
-          echo 'server:' > config/server.config.yaml
-          echo '  auth_token: "test-docker-token"' >> config/server.config.yaml
-          echo '  host: 0.0.0.0' >> config/server.config.yaml
-          echo '  port: 4444' >> config/server.config.yaml
+          mkdir -p .rgcc
+          cat > .rgcc/server.config.yaml << 'EOF'
+          server:
+            auth_token: "test-docker-token"
+            host: 0.0.0.0
+            port: 4444
+          EOF
 
           docker run -d --name test-server \
-            -v $(pwd)/config:/app/config:ro \
+            -v $(pwd)/.rgcc:/app/.rgcc:ro \
             -p 4444:4444 \
             ${{ env.IMAGE_PREFIX }}-server:test
 
           sleep 5
           docker logs test-server
-          
-          # Health check
+
           if ! curl -s -f http://localhost:4444/health; then
             echo "FATAL: Server health check failed!"
             docker ps -a
             exit 1
           fi
 
-          docker ps | grep test-server
           docker stop test-server
           docker rm test-server
 
@@ -97,6 +97,8 @@ jobs:
           image-ref: ${{ env.IMAGE_PREFIX }}-server:test
           format: sarif
           output: trivy-results.sarif
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4

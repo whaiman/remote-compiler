@@ -1,14 +1,14 @@
 import argparse
 import logging
 
-import uvicorn
-
 from rgcc import __version__
 
-from rgcc.shared.config import load_server_config
 
+def main() -> int:
+    import uvicorn
 
-def main() -> None:
+    from rgcc.core.config import load_server_config
+
     parser = argparse.ArgumentParser(
         prog="rgccd",
         description="RGCC Build Server Daemon",
@@ -47,6 +47,7 @@ def main() -> None:
         port=port,
         reload=args.reload,
     )
+    return 0
 
 
 if __name__ == "__main__":

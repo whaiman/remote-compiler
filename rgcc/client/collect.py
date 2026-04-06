@@ -53,7 +53,7 @@ def resolve_includes(
                         break
 
         if inc_path is None:
-            # System header or genuinely missing — skip silently
+            # System header or genuinely missing - skip silently
             continue
 
         if inc_path not in processed_files:

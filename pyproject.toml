@@ -10,35 +10,25 @@ dependencies = [
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 
-[project.optional-dependencies]
-client = [
-    "httpx",
-    "typer[all]",
-    "rich"
-]
-server = [
-    "starlette",
-    "uvicorn",
-    "python-multipart"
-]
-dev = [
-    "remote-compiler[client,server]",
-    "pytest>=7.0",
-    "pytest-asyncio",
-    "pytest-cov",
-    "mypy",
-    "bandit",
-    "safety",
-]
 
-[project.scripts]
-rgcc = "rgcc:client_main"
-rgccd = "rgcc:server_main"
+[project.optional-dependencies]
+client = ["httpx", "typer[all]", "rich"]
+server = ["starlette", "uvicorn", "python-multipart"]
+dev    = [
+    "httpx", "typer[all]", "rich",
+    "starlette", "uvicorn", "python-multipart",
+    "pytest", "ruff", "black",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["rgcc", "rgcc.*"]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+explicit_package_bases = true
