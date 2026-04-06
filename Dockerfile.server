@@ -5,18 +5,13 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
 
-# Copy the shared rgcc code and the specific server package
+# Copy code and project configuration
 COPY rgcc/ ./rgcc/
-COPY packages/rgcc-server/ ./packages/rgcc-server/
+COPY pyproject.toml .
+COPY README.md .
 
-# Prepare the package structure: copy shared code INTO the package directory 
-# to bypass build isolation issues with relative paths in monorepo
-RUN cp -r rgcc/ packages/rgcc-server/ \
-    && find packages/rgcc-server/rgcc -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
-    && find packages/rgcc-server/rgcc -name "*.pyc" -delete 2>/dev/null || true
-
-# Install ONLY the server package
-RUN pip install --user --no-cache-dir "./packages/rgcc-server"
+# Install only server dependencies and the rgccd entry point
+RUN pip install --user --no-cache-dir ".[server]"
 
 # Production stage
 FROM python:3.11-slim
