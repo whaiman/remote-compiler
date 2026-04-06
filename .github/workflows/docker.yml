@@ -65,8 +65,7 @@ jobs:
 
       - name: Smoke test (Server)
         run: |
-          mkdir -p .rgcc
-          cat > .rgcc/server.config.yaml << 'EOF'
+          cat > rgccd.yaml << 'EOF'
           server:
             auth_token: "test-docker-token"
             host: 0.0.0.0
@@ -74,7 +73,7 @@ jobs:
           EOF
 
           docker run -d --name test-server \
-            -v $(pwd)/.rgcc:/app/.rgcc:ro \
+            -v $(pwd)/rgccd.yaml:/app/rgccd.yaml:ro \
             -p 4444:4444 \
             ${{ env.IMAGE_PREFIX }}-server:test
 

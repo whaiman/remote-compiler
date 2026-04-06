@@ -82,7 +82,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - package: rgcc-server
+          - extra: server
             output: rgccd
             entrypoint: rgcc/server/__main__.py
 
@@ -96,7 +96,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller
-          pip install -e packages/${{ matrix.package }}
+          pip install -e .
 
       - name: Build binary with PyInstaller
         run: |

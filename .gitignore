@@ -194,8 +194,11 @@ marimo/_lsp/
 __marimo__/
 
 spec.md
+RELEASE.md
 build.json
 code_review.md
 server.log
-.rgcc/*.yaml
+rgcc.yaml
+rgccd.yaml
 logs_*
+clean.py
