@@ -3,6 +3,8 @@
 
 import sys
 
+from rgcc.core import checksum, config, crypto, manifest
+
 
 def test_client_is_lazy():
     """Verify client installation doesn't import server modules."""
@@ -33,7 +35,7 @@ def test_server_is_lazy():
 def test_core_imports():
     """Verify that core shared modules can be imported."""
     print("Testing core imports...")
-    from rgcc.core import checksum, config, crypto, manifest, platforms
+    from rgcc.core import platforms
 
     assert all([checksum, config, crypto, manifest, platforms])
     print("✓ Core imports OK")
