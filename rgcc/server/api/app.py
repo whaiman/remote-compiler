@@ -9,12 +9,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from starlette.applications import Starlette
-from starlette.background import BackgroundTask
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
-
 from rgcc.core.config import load_server_config
 from rgcc.core.crypto import (
     compute_shared_key,
@@ -23,6 +17,13 @@ from rgcc.core.crypto import (
     generate_ec_keypair,
 )
 from rgcc.core.manifest import BuildManifest
+from rgcc.core.security import safe_extract
+from starlette.applications import Starlette
+from starlette.background import BackgroundTask
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+
 from rgcc.server.compiler.fallback import run_fallback_compilation
 from rgcc.server.compiler.runner import run_compilation
 from rgcc.server.jobs.store import job_store
@@ -117,7 +118,7 @@ async def compile(request: Request) -> Response:
         src_dir.mkdir()
 
         with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=src_dir, filter="data")
+            safe_extract(tar, src_dir)
 
         src_files = []
         for root, _, current_files in os.walk(src_dir):

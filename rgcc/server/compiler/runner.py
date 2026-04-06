@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.platforms import ALLOWED_COMPILERS, PLATFORM_MAP
+from rgcc.core.security import filter_safe_flags
 
 logger = logging.getLogger("server.compiler")
 
@@ -46,19 +47,25 @@ def _build_command(
     # Global compiler args (e.g. color diagnostics)
     cmd.extend(compiler_cfg.get("default_args", []))
 
-    # Cross-compilation flags
+    # Cross-compilation and Target flags
+    final_target = manifest.target or platform_cfg.get("target")
+    if final_target:
+        cmd.extend(["-target", final_target])
+
+    final_sysroot = manifest.sysroot or platform_cfg.get("sysroot")
+    if final_sysroot:
+        cmd.extend(["-sysroot", final_sysroot])
+
     if is_cross:
-        if target := platform_cfg.get("target"):
-            cmd.extend(["-target", target])
-        if sysroot := platform_cfg.get("sysroot"):
-            cmd.extend(["-sysroot", sysroot])
         cmd.extend(platform_cfg.get("args", []))
 
     # Language standard
     if manifest.language == "c++":
         cmd.append(f"-std={manifest.standard}")
 
-    cmd.extend(manifest.flags)
+    # Security: Filter out dangerous compiler flags from the client
+    safe_flags = filter_safe_flags(manifest.flags)
+    cmd.extend(safe_flags)
 
     # Always expose the project root so that <lib/header.hpp> style includes
     # resolve correctly for local libraries bundled with the project.
