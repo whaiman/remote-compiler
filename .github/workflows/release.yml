@@ -28,11 +28,23 @@ jobs:
         env:
           OUTPUT: CHANGES.md
 
-      - name: Upload changelog artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: changelog
-          path: CHANGES.md
+      - name: Commit updated CHANGELOG.md
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -f CHANGELOG.md ]; then
+            cat CHANGES.md > NEW_CHANGELOG.md
+            echo "" >> NEW_CHANGELOG.md
+            tail -n +2 CHANGELOG.md >> NEW_CHANGELOG.md
+          else
+            cp CHANGES.md CHANGELOG.md
+          fi
+
+          mv NEW_CHANGELOG.md CHANGELOG.md || true
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin main || echo "Push failed, may need manual update"
 
   release:
     needs: changelog
@@ -41,40 +53,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download changelog
-        uses: actions/download-artifact@v4
-        with:
-          name: changelog
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: CHANGES.md
+          body: ${{ needs.changelog.outputs.release_body }}
           generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-
-      - name: Update CHANGELOG.md in repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin main
-          git checkout main
-
-          if [ -f CHANGELOG.md ]; then
-            cat CHANGES.md > NEW_CHANGELOG.md
-            echo "" >> NEW_CHANGELOG.md
-            tail -n +2 CHANGELOG.md >> NEW_CHANGELOG.md
-          else
-            cat CHANGES.md > NEW_CHANGELOG.md
-          fi
-
-          mv NEW_CHANGELOG.md CHANGELOG.md
-          git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}" || echo "No changes to commit"
-          git pull origin main --rebase || true
-          git push origin main || echo "Push failed, may need manual update"
 
   build-binaries:
     needs: changelog
@@ -82,10 +67,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - extra: server
+          - name: server
             output: rgccd
             entrypoint: rgcc/server/__main__.py
-
     steps:
       - uses: actions/checkout@v4
 
