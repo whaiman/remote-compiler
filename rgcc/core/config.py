@@ -15,15 +15,39 @@ def load_server_config() -> dict[str, Any]:
         SERVER_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         auth_token = secrets.token_urlsafe(32)
         config = {
+            "logging": {
+                "log_file": "server.log",
+                "enable_file_logging": False,
+                "enable_console_logging": True,
+            },
             "server": {
                 "host": "0.0.0.0",
                 "port": 4444,
                 "auth_token": auth_token,
             },
-            "logging": {
-                "log_file": "server.log",
-                "enable_file_logging": False,
-                "enable_console_logging": True,
+            "compilers": {
+                "g++": {
+                    "default_args": ["-fdiagnostics-color=always"],
+                    "platforms": {
+                        "linux": {"target": "x86_64-linux-gnu", "args": []},
+                        "win64": {
+                            "target": "x86_64-w64-mingw32",
+                            "sysroot": "/usr/x86_64-w64-mingw32",
+                            "args": ["-static", "-static-libgcc", "-static-libstdc++"],
+                        },
+                    },
+                },
+                "gcc": {
+                    "default_args": ["-fdiagnostics-color=always"],
+                    "platforms": {
+                        "linux": {"target": "x86_64-linux-gnu", "args": []},
+                        "win64": {
+                            "target": "x86_64-w64-mingw32",
+                            "sysroot": "/usr/x86_64-w64-mingw32",
+                            "args": ["-static"],
+                        },
+                    },
+                },
             },
         }
         with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:

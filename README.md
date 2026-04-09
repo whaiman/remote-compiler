@@ -51,18 +51,32 @@ server:
   port: 4444
 
 compilers:
-  clang++:
-    default_args: ["-fcolor-diagnostics"]
+  g++:
+    default_args:
+      - -fdiagnostics-color=always
     platforms:
+      linux:
+        args: []
+        target: x86_64-linux-gnu
       win64:
-        target: "x86_64-w64-mingw32"
-        sysroot: "/usr/x86_64-w64-mingw32"
-        args: ["-static", "-fuse-ld=lld", "-static-libgcc", "-static-libstdc++"]
-  clang:
+        args:
+          - -static
+          - -static-libgcc
+          - -static-libstdc++
+        sysroot: /usr/x86_64-w64-mingw32
+        target: x86_64-w64-mingw32
+  gcc:
+    default_args:
+      - -fdiagnostics-color=always
     platforms:
+      linux:
+        args: []
+        target: x86_64-linux-gnu
       win64:
-        target: "x86_64-w64-mingw32"
-        args: ["-static", "-fuse-ld=lld"]
+        args:
+          - -static
+        sysroot: /usr/x86_64-w64-mingw32
+        target: x86_64-w64-mingw32
 ```
 
 Override host/port at runtime if needed:
