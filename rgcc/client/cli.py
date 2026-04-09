@@ -465,11 +465,18 @@ def compile(
             api_ep = endpoint or cfg.get("endpoint")
             api_token = cfg.get("auth_token")
 
-            if not api_ep or not api_token or "CHANGE_ME" in str(api_ep) or "PASTE_TOKEN" in str(api_token):
+            if (
+                not api_ep
+                or not api_token
+                or "CHANGE_ME" in str(api_ep)
+                or "PASTE_TOKEN" in str(api_token)
+            ):
                 console.print(
                     "\n[bold red]Error:[/bold red] Missing or invalid configuration in [cyan]rgcc.yaml[/cyan]."
                 )
-                console.print("Please edit [cyan]rgcc.yaml[/cyan] and set your server [bold yellow]endpoint[/bold yellow] and [bold yellow]auth_token[/bold yellow].")
+                console.print(
+                    "Please edit [cyan]rgcc.yaml[/cyan] and set your server [bold yellow]endpoint[/bold yellow] and [bold yellow]auth_token[/bold yellow]."
+                )
                 raise typer.Exit(1)
 
             api_client = ApiClient(api_ep, api_token)
