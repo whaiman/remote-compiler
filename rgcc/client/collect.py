@@ -1,33 +1,28 @@
 import re
+from collections import deque
 from pathlib import Path
 from typing import List, Optional, Set
 
 
-def resolve_includes(
+def _resolve_single(
     file_path: Path,
     base_dir: Path,
-    processed_files: Set[Path],
     extra_include_dirs: Optional[List[Path]] = None,
 ) -> Set[Path]:
-    """Recursively resolve local #include dependencies."""
-    if file_path in processed_files:
-        return processed_files
-
-    processed_files.add(file_path)
-
+    """Parse *file_path* and return the set of local #include paths it references."""
     if not file_path.exists():
-        return processed_files
+        return set()
 
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
     except Exception:
-        return processed_files
+        return set()
 
-    # Match both #include "file.h" and #include <file.h>
-    include_pattern = re.compile(r'#include\s+(?:"([^"]+)"|<([^>]+)>)')
+    include_pattern = re.compile(r'#include\s+(?:\"([^\"]+)\"|<([^>]+)>)')
     matches = include_pattern.findall(content)
 
+    discovered: Set[Path] = set()
     for quoted, angled in matches:
         match = quoted or angled
         if not match:
@@ -56,17 +51,43 @@ def resolve_includes(
             # System header or genuinely missing - skip silently
             continue
 
-        if inc_path not in processed_files:
-            resolve_includes(inc_path, base_dir, processed_files, extra_include_dirs)
+        discovered.add(inc_path)
 
         # Heuristic: if we found a local header, try to find its matching source file
         if inc_path.suffix.lower() in {".h", ".hpp", ".hh"}:
             for src_ext in {".cpp", ".c", ".cc", ".cxx"}:
                 src_path = inc_path.with_suffix(src_ext)
-                if src_path.exists() and src_path not in processed_files:
-                    resolve_includes(
-                        src_path, base_dir, processed_files, extra_include_dirs
-                    )
+                if src_path.exists() and src_path.is_relative_to(base_dir):
+                    discovered.add(src_path)
+
+    return discovered
+
+
+def resolve_includes(
+    file_path: Path,
+    base_dir: Path,
+    processed_files: Set[Path],
+    extra_include_dirs: Optional[List[Path]] = None,
+) -> Set[Path]:
+    """Iteratively resolve local #include dependencies using BFS.
+
+    This avoids RecursionError on deeply nested include trees (issue #19).
+    """
+    queue: deque[Path] = deque()
+
+    if file_path not in processed_files:
+        queue.append(file_path)
+
+    while queue:
+        current = queue.popleft()
+        if current in processed_files:
+            continue
+        processed_files.add(current)
+
+        discovered = _resolve_single(current, base_dir, extra_include_dirs)
+        for dep in discovered:
+            if dep not in processed_files:
+                queue.append(dep)
 
     return processed_files
 
