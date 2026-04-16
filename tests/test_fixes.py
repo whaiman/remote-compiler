@@ -35,7 +35,9 @@ class TestIterativeIncludeResolution:
         depth = 1500
         # Create a chain: f0.h -> f1.h -> ... -> f1499.h
         for i in range(depth):
-            (tmp_path / f"f{i}.h").write_text(f'#include "f{i + 1}.h"\n' if i < depth - 1 else "// leaf\n")
+            (tmp_path / f"f{i}.h").write_text(
+                f'#include "f{i + 1}.h"\n' if i < depth - 1 else "// leaf\n"
+            )
 
         result = resolve_includes(tmp_path / "f0.h", tmp_path, set())
         assert len(result) == depth
@@ -66,7 +68,9 @@ class TestIterativeIncludeResolution:
         """Missing includes (e.g. system headers) are silently skipped."""
         from rgcc.client.collect import resolve_includes
 
-        (tmp_path / "main.cpp").write_text('#include <iostream>\n#include "nonexistent.h"\nint main(){}\n')
+        (tmp_path / "main.cpp").write_text(
+            '#include <iostream>\n#include "nonexistent.h"\nint main(){}\n'
+        )
 
         result = resolve_includes(tmp_path / "main.cpp", tmp_path, set())
         names = {p.name for p in result}
@@ -79,7 +83,7 @@ class TestIterativeIncludeResolution:
         inc_dir = tmp_path / "include"
         inc_dir.mkdir()
         (inc_dir / "mylib.h").write_text("// mylib\n")
-        (tmp_path / "main.cpp").write_text('#include <mylib.h>\nint main(){}\n')
+        (tmp_path / "main.cpp").write_text("#include <mylib.h>\nint main(){}\n")
 
         result = resolve_includes(tmp_path / "main.cpp", tmp_path, set(), [inc_dir])
         names = {p.name for p in result}

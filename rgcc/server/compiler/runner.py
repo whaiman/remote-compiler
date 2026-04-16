@@ -50,11 +50,20 @@ def _build_command(
     # Cross-compilation and Target flags
     final_target = manifest.target or platform_cfg.get("target")
     if final_target:
-        cmd.extend(["-target", final_target])
+        # Clang supports -target, but GCC expects the target as part of the binary name
+        # or doesn't use this flag at all. We only add it for Clang.
+        if "clang" in compiler_exe.lower():
+            cmd.extend(["-target", final_target])
 
     final_sysroot = manifest.sysroot or platform_cfg.get("sysroot")
     if final_sysroot:
-        cmd.extend(["-sysroot", final_sysroot])
+        sysroot_path = Path(final_sysroot)
+        # Only add sysroot if it exists. This avoids breaking native builds on
+        # Windows when a Linux-style sysroot is configured in rgccd.yaml
+        if sysroot_path.exists():
+            cmd.extend(["--sysroot", str(final_sysroot)])
+        else:
+            logger.debug("Skipping non-existent sysroot: %s", final_sysroot)
 
     if is_cross:
         cmd.extend(platform_cfg.get("args", []))

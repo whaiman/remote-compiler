@@ -19,7 +19,7 @@ def _resolve_single(
     except Exception:
         return set()
 
-    include_pattern = re.compile(r'#include\s+(?:\"([^\"]+)\"|<([^>]+)>)')
+    include_pattern = re.compile(r"#include\s+(?:\"([^\"]+)\"|<([^>]+)>)")
     matches = include_pattern.findall(content)
 
     discovered: Set[Path] = set()
