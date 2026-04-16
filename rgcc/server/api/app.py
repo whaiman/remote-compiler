@@ -13,6 +13,7 @@ from rgcc.core.config import load_server_config
 from rgcc.core.crypto import (
     compute_shared_key,
     decrypt_payload,
+    derive_key,
     encrypt_payload,
     generate_ec_keypair,
 )
@@ -40,8 +41,9 @@ if not AUTH_TOKEN:
     logger.error("Configuration error: 'auth_token' missing in server_config.yaml")
     raise RuntimeError("Missing required configuration keys.")
 
-# Single server runtime master key for encrypting transient Session Tickets
-MASTER_TICKET_KEY = os.urandom(32).hex()
+# Derive master key deterministically from AUTH_TOKEN so it survives restarts.
+# Session tickets issued before a restart remain valid (fixes #18).
+MASTER_TICKET_KEY = derive_key(AUTH_TOKEN, salt=b"master_ticket_v1").hex()
 
 
 @dataclass
