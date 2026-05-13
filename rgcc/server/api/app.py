@@ -9,6 +9,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from starlette.applications import Starlette
+from starlette.background import BackgroundTask
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
+
 from rgcc.core.config import load_server_config
 from rgcc.core.crypto import (
     compute_shared_key,
@@ -19,14 +25,9 @@ from rgcc.core.crypto import (
 )
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.security import safe_extract
-from starlette.applications import Starlette
-from starlette.background import BackgroundTask
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
-
+from rgcc.server.buildinfo import generate as make_buildinfo
 from rgcc.server.compiler.fallback import run_fallback_compilation
-from rgcc.server.compiler.runner import run_compilation
+from rgcc.server.compiler.runner import get_repro_flags, run_compilation
 from rgcc.server.jobs.store import job_store
 
 # 1. Initialize App and Logger first so we can use them
@@ -175,6 +176,24 @@ async def compile(request: Request) -> Response:
 
             if comp_result.output_path and comp_result.output_path.exists():
                 tar.add(comp_result.output_path, arcname=comp_result.output_path.name)
+
+                # Generate buildinfo.json if it's a manifest-based build
+                if manifest_path.exists():
+                    try:
+                        info = make_buildinfo(
+                            compiler=manifest.compiler,
+                            standard=manifest.standard,
+                            flags=manifest.flags
+                            + get_repro_flags(src_dir, normalize=True),
+                            platform_target=manifest.platform,
+                            source_dir=src_dir,
+                            binary_path=comp_result.output_path,
+                        )
+                        buildinfo_path = work_dir / "buildinfo.json"
+                        buildinfo_path.write_text(json.dumps(info, indent=2))
+                        tar.add(buildinfo_path, arcname="buildinfo.json")
+                    except Exception as e:
+                        logger.error(f"Failed to generate buildinfo: {e}")
 
         # 6. Encrypt Response
         with open(response_archive_path, "rb") as response_file:

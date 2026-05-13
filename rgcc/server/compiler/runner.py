@@ -1,4 +1,5 @@
 import logging
+import os
 import platform as _platform
 import subprocess
 import time
@@ -22,6 +23,20 @@ class CompilationResult:
     stderr: str
     duration: float
     output_path: Optional[Path] = None
+
+
+def get_repro_flags(src_dir: Path, normalize: bool = False) -> list[str]:
+    """Reproducibility flags passed to the compiler. Single source of truth.
+
+    normalize=True - for buildinfo (without real temp dir).
+    normalize=False - for compiler (real path is important)."""
+
+    prefix_map = (
+        "-ffile-prefix-map=<src>=."
+        if normalize
+        else f"-ffile-prefix-map={src_dir.as_posix()}=."
+    )
+    return [prefix_map, "-Werror=date-time"]
 
 
 def _build_command(
@@ -71,6 +86,7 @@ def _build_command(
     # Language standard
     if manifest.language == "c++":
         cmd.append(f"-std={manifest.standard}")
+    cmd.extend(get_repro_flags(src_dir))
 
     # Security: Filter out dangerous compiler flags from the client
     safe_flags = filter_safe_flags(manifest.flags)
@@ -119,10 +135,18 @@ def run_compilation(
     cmd = _build_command(manifest, src_dir, output_path, config)
     logger.info("Running: %s", " ".join(cmd))
 
+    env = os.environ.copy()
+    env["SOURCE_DATE_EPOCH"] = "1715544000"
+
     start = time.time()
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, cwd=src_dir
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=src_dir,
+            env=env,
         )
         return CompilationResult(
             returncode=proc.returncode,

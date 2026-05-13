@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import platform as _platform
@@ -22,7 +23,6 @@ from rgcc.core.config import load_client_config
 from rgcc.core.manifest import SOURCE_EXTENSIONS, BuildManifest
 from rgcc.core.platforms import PLATFORM_MAP
 from rgcc.core.security import safe_extract
-
 
 app = typer.Typer(name="rgcc", help="Remote GCC Compiler Client")
 console = Console()
@@ -194,14 +194,10 @@ def _apply_cli_overrides(
     if standard is not None:
         # Explicit CLI value always wins.
         manifest.standard = standard
-    elif manifest.standard in ("c++17", "c++23", "c11", "c17"):
-        # Looks like a dataclass default - re-derive from the actual language.
-        manifest.standard = _detect_standard(manifest.language)
 
     # --- compiler ---
-    if manifest.compiler in ("g++", "gcc"):
-        # Dataclass default - re-derive from the entry point language.
-        manifest.compiler = _detect_compiler(entry_point)
+    # We keep the compiler from the manifest unless it's a fresh one (handled in generate_build_manifest)
+    # or the user explicitly changes the language/entry_point (not supported yet via CLI overrides).
 
     if compile_only and "-c" not in manifest.flags:
         manifest.flags.append("-c")
@@ -338,6 +334,45 @@ def _cleanup_artifacts(out_dist: Path, manifest: BuildManifest) -> None:
         log_path.unlink()
 
 
+def _verify_buildinfo(out_dist: Path, binary_name: str) -> None:
+    """Verify that the binary matches the buildinfo.json hash."""
+    buildinfo_path = out_dist / "buildinfo.json"
+    if not buildinfo_path.exists():
+        console.print(
+            "[yellow]Warning:[/yellow] buildinfo.json not found - build not verifiable"
+        )
+        return
+
+    try:
+        info = json.loads(buildinfo_path.read_text())
+        binary_path = out_dist / binary_name
+
+        if not binary_path.exists():
+            console.print(
+                f"[bold red]Error:[/bold red] Binary {binary_name} not found in artifacts"
+            )
+            return
+
+        actual_hash = hashlib.sha256(binary_path.read_bytes()).hexdigest()
+        expected_hash = info.get("binary_hash")
+
+        if actual_hash == expected_hash:
+            console.print(
+                f"[bold green][ok][/bold green] Binary hash verified: [cyan]{actual_hash[:16]}...[/cyan]"
+            )
+            console.print(
+                f"     Built with: {info.get('compiler_version')}, std={info.get('standard')}"
+            )
+        else:
+            console.print(
+                "[bold red][FAIL] Binary hash mismatch - possible tampering in transit![/bold red]"
+            )
+            console.print(f"  expected: {expected_hash}")
+            console.print(f"  actual:   {actual_hash}")
+    except Exception as e:
+        console.print(f"[bold red]Error verifying buildinfo:[/bold red] {e}")
+
+
 # ─── Commands ──────────────────────────────────────────────────────────────────
 
 
@@ -384,13 +419,18 @@ def compile(
     save_manifest: bool = typer.Option(
         True, "--manifest/--no-manifest", help="Whether to save manifest_result.json"
     ),
+    verify_reproducible: bool = typer.Option(
+        False,
+        "--verify-reproducible",
+        help="Perform two independent builds and compare hashes to ensure determinism",
+    ),
 ) -> None:
     """Compile and link a source tree on a remote server."""
     if not entry_point.exists():
         console.print(f"[bold red]Error:[/bold red] File {entry_point} not found.")
         raise typer.Exit(1)
 
-    console.print(f"📡 Remote Compiler: Preparing [cyan]{entry_point.name}[/cyan]...")
+    console.print(f"Remote Compiler: Preparing [cyan]{entry_point.name}[/cyan]...")
 
     entry_point = entry_point.resolve()
     project_root = _resolve_project_root(entry_point)
@@ -480,10 +520,54 @@ def compile(
                 raise typer.Exit(1)
 
             api_client = ApiClient(api_ep, api_token)
-            response_encrypted = asyncio.run(api_client.send_payload(archive_path))
 
-            progress.add_task("Downloading artifacts...", total=None)
-            response_data = asyncio.run(api_client.decrypt_response(response_encrypted))
+            if verify_reproducible:
+                console.print(
+                    "\n[bold yellow]Reproducibility check enabled.[/bold yellow] Performing two independent builds..."
+                )
+                progress.add_task("First build...", total=None)
+                resp1_enc = asyncio.run(api_client.send_payload(archive_path))
+                resp1_data = asyncio.run(api_client.decrypt_response(resp1_enc))
+
+                progress.add_task("Second build...", total=None)
+                resp2_enc = asyncio.run(api_client.send_payload(archive_path))
+                resp2_data = asyncio.run(api_client.decrypt_response(resp2_enc))
+
+                # Extract hashes from both
+                hashes = []
+                for i, data in enumerate([resp1_data, resp2_data]):
+                    tmp_res = work_dir / f"res{i}.tar.gz"
+                    tmp_res.write_bytes(data)
+                    with tarfile.open(tmp_res, "r:gz") as tar:
+                        info_file = tar.extractfile("buildinfo.json")
+                        if info_file:
+                            info = json.loads(info_file.read())
+                            hashes.append(info.get("binary_hash"))
+
+                if len(hashes) == 2:
+                    if hashes[0] == hashes[1]:
+                        console.print(
+                            f"[bold green][PASS][/bold green] Reproducibility verified! Binary hash: [cyan]{hashes[0][:16]}...[/cyan]"
+                        )
+                    else:
+                        console.print(
+                            "[bold red][FAIL] Reproducibility check failed! Binaries differ.[/bold red]"
+                        )
+                        console.print(f"  Build 1 hash: {hashes[0]}")
+                        console.print(f"  Build 2 hash: {hashes[1]}")
+                else:
+                    console.print(
+                        "[bold yellow]Warning:[/bold yellow] Could not extract buildinfo from both builds."
+                    )
+
+                response_data = resp1_data  # Use first build for final artifacts
+            else:
+                progress.add_task("Uploading and compiling...", total=None)
+                response_encrypted = asyncio.run(api_client.send_payload(archive_path))
+                progress.add_task("Downloading artifacts...", total=None)
+                response_data = asyncio.run(
+                    api_client.decrypt_response(response_encrypted)
+                )
 
             result_archive_path = work_dir / "result.tar.gz"
             result_archive_path.write_bytes(response_data)
@@ -494,6 +578,7 @@ def compile(
                 safe_extract(tar, out_dist)
 
             _print_result(out_dist)
+            _verify_buildinfo(out_dist, manifest.output)
             _cleanup_artifacts(out_dist, manifest)
 
         finally:

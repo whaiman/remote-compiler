@@ -30,16 +30,25 @@ def _get_pid() -> Optional[int]:
     return None
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"rgccd [cyan]v{__version__}[/cyan]")
+        raise typer.Exit()
+
+
 @app.callback()
 def callback(
     version: Optional[bool] = typer.Option(
-        None, "--version", "-v", help="Show version and exit", is_eager=True
+        None,
+        "--version",
+        "-v",
+        help="Show version and exit",
+        callback=_version_callback,
+        is_eager=True,
     ),
 ):
     """RGCC Build Server Control Panel."""
-    if version:
-        console.print(f"rgccd [cyan]v{__version__}[/cyan]")
-        raise typer.Exit()
+    pass
 
 
 @app.command()
@@ -69,6 +78,9 @@ def start(
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
+    # Set fixed epoch for reproducible builds
+    os.environ["SOURCE_DATE_EPOCH"] = "1778616000"
+
     cfg = load_server_config()
     server_cfg = cfg.get("server", {})
 
@@ -79,9 +91,9 @@ def start(
 
     console.print(
         Panel(
-            f"🚀 [bold cyan]RGCC Server v{__version__}[/bold cyan]\n"
-            f"📍 [yellow]Endpoint:[/yellow] {final_host}:{final_port}\n"
-            f"📝 [dim]Logging enabled (Standard Output)[/dim]",
+            f"[bold cyan]RGCC Server v{__version__}[/bold cyan]\n"
+            f"Endpoint: {final_host}:{final_port}\n"
+            f"[dim]Logging enabled (Standard Output)[/dim]",
             title="Server Startup",
             expand=False,
         )
@@ -141,7 +153,7 @@ def token(
         with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(cfg, f, default_flow_style=False)
 
-        console.print("\n✨ [bold green]New Token Generated and Saved![/bold green]")
+        console.print("\n[bold green]New Token Generated and Saved![/bold green]")
         console.print(
             Panel(
                 f"[bold yellow]{new_token}[/bold yellow]",
@@ -151,7 +163,7 @@ def token(
         )
     else:
         current_token = cfg.get("server", {}).get("auth_token", "NOT_SET")
-        console.print("\n🔑 [bold cyan]Current Auth Token:[/bold cyan]")
+        console.print("\n[bold cyan]Current Auth Token:[/bold cyan]")
         console.print(
             Panel(
                 f"[bold yellow]{current_token}[/bold yellow]",
