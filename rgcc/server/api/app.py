@@ -24,6 +24,7 @@ from rgcc.core.crypto import (
     encrypt_payload,
     generate_ec_keypair,
 )
+from rgcc.core.checksum import verify_checksum
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.security import safe_extract
 from rgcc.server.buildinfo import generate as make_buildinfo
@@ -152,6 +153,21 @@ async def compile(request: Request) -> Response:
             with open(manifest_path, "r", encoding="utf-8") as manifest_file:
                 manifest_dict = json.load(manifest_file)
                 manifest = BuildManifest.from_dict(manifest_dict)
+
+                # Verify entry-point integrity before compilation
+                if manifest.checksum_sha256:
+                    entry_abs = src_dir / manifest.entry_point
+                    if not entry_abs.exists():
+                        return JSONResponse(
+                            {"detail": "Entry-point file not found"},
+                            status_code=400,
+                        )
+                    if not verify_checksum(entry_abs, manifest.checksum_sha256):
+                        return JSONResponse(
+                            {"detail": "Entry-point checksum mismatch"},
+                            status_code=400,
+                        )
+
                 comp_result = run_compilation(manifest, work_dir, config=CFG)
         else:
             sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
