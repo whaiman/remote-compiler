@@ -15,6 +15,13 @@ logger = logging.getLogger("server.compiler")
 
 _HOST_PLATFORM = PLATFORM_MAP.get(_platform.system().lower(), "linux")
 
+ALLOWED_PLATFORMS = {"linux", "win64", "darwin"}
+ALLOWED_STANDARDS = {
+    "c89", "c90", "c99", "c11", "c17", "c23",
+    "c++11", "c++14", "c++17", "c++20", "c++23",
+    "gnu99", "gnu11", "gnu17", "gnu++17", "gnu++20", "gnu++23"
+}
+
 
 @dataclass
 class CompilationResult:
@@ -121,11 +128,21 @@ def run_compilation(
 ) -> CompilationResult:
     """Run a compilation task based on a manifest."""
     config = config or {}
+
+    if manifest.platform not in ALLOWED_PLATFORMS:
+        raise ValueError(f"Unknown platform: {manifest.platform!r}")
+
+    if manifest.standard not in ALLOWED_STANDARDS:
+        raise ValueError(f"Unknown standard: {manifest.standard!r}")
+
     src_dir = working_dir / "src"
     out_dir = working_dir / "out"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    output_path = out_dir / manifest.output
+    output_path = (out_dir / manifest.output).resolve()
+    if not output_path.is_relative_to(out_dir.resolve()):
+        raise ValueError("output path escapes work directory")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     entry_path = (src_dir / manifest.entry_point).resolve()
