@@ -48,6 +48,7 @@ if not AUTH_TOKEN:
 MASTER_TICKET_KEY = derive_key(AUTH_TOKEN, salt=b"master_ticket_v1").hex()
 
 USED_TICKETS: set[str] = set()
+MAX_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 @dataclass
@@ -109,6 +110,10 @@ async def compile(request: Request) -> Response:
     except Exception as e:
         logger.warning(f"Invalid session check: {e}")
         return JSONResponse({"detail": "Invalid session ticket"}, status_code=401)
+    content_length = int(request.headers.get("content-length", 0))
+    if content_length > MAX_PAYLOAD_BYTES:
+        return JSONResponse({"detail": "Payload too large"}, status_code=413)
+
     body = await request.body()
 
     # 1. Decrypt payload
