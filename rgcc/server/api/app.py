@@ -5,10 +5,10 @@ import shutil
 import tarfile
 import tempfile
 import time
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
-import uuid
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
@@ -24,6 +24,7 @@ from rgcc.core.crypto import (
     encrypt_payload,
     generate_ec_keypair,
 )
+from rgcc.core.checksum import verify_checksum
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.security import safe_extract
 from rgcc.server.buildinfo import generate as make_buildinfo
@@ -48,6 +49,7 @@ if not AUTH_TOKEN:
 MASTER_TICKET_KEY = derive_key(AUTH_TOKEN, salt=b"master_ticket_v1").hex()
 
 USED_TICKETS: set[str] = set()
+MAX_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 @dataclass
@@ -65,6 +67,9 @@ class HandshakeResponse:
 
 
 async def handshake(request: Request) -> Response:
+    if request.headers.get("Authorization") != f"Bearer {AUTH_TOKEN}":
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
     try:
         data = await request.json()
         req = HandshakeRequest(**data)
@@ -109,6 +114,10 @@ async def compile(request: Request) -> Response:
     except Exception as e:
         logger.warning(f"Invalid session check: {e}")
         return JSONResponse({"detail": "Invalid session ticket"}, status_code=401)
+    content_length = int(request.headers.get("content-length", 0))
+    if content_length > MAX_PAYLOAD_BYTES:
+        return JSONResponse({"detail": "Payload too large"}, status_code=413)
+
     body = await request.body()
 
     # 1. Decrypt payload
@@ -144,6 +153,21 @@ async def compile(request: Request) -> Response:
             with open(manifest_path, "r", encoding="utf-8") as manifest_file:
                 manifest_dict = json.load(manifest_file)
                 manifest = BuildManifest.from_dict(manifest_dict)
+
+                # Verify entry-point integrity before compilation
+                if manifest.checksum_sha256:
+                    entry_abs = src_dir / manifest.entry_point
+                    if not entry_abs.exists():
+                        return JSONResponse(
+                            {"detail": "Entry-point file not found"},
+                            status_code=400,
+                        )
+                    if not verify_checksum(entry_abs, manifest.checksum_sha256):
+                        return JSONResponse(
+                            {"detail": "Entry-point checksum mismatch"},
+                            status_code=400,
+                        )
+
                 comp_result = run_compilation(manifest, work_dir, config=CFG)
         else:
             sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
@@ -217,7 +241,7 @@ async def compile(request: Request) -> Response:
     except Exception as e:
         shutil.rmtree(work_dir, ignore_errors=True)
         logger.exception("Unexpected error: %s", e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
 
 async def health(request: Request) -> Response:
