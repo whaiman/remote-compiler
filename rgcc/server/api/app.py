@@ -5,10 +5,10 @@ import shutil
 import tarfile
 import tempfile
 import time
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
-import uuid
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
@@ -217,7 +217,7 @@ async def compile(request: Request) -> Response:
     except Exception as e:
         shutil.rmtree(work_dir, ignore_errors=True)
         logger.exception("Unexpected error: %s", e)
-        return JSONResponse({"detail": str(e)}, status_code=500)
+        return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
 
 async def health(request: Request) -> Response:
