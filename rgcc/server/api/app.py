@@ -66,6 +66,9 @@ class HandshakeResponse:
 
 
 async def handshake(request: Request) -> Response:
+    if request.headers.get("Authorization") != f"Bearer {AUTH_TOKEN}":
+        return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
     try:
         data = await request.json()
         req = HandshakeRequest(**data)
