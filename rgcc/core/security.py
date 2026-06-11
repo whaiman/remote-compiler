@@ -70,12 +70,21 @@ def safe_extract(tar: tarfile.TarFile, path: Path) -> None:
         # Python 3.12+ native protection
         tar.extractall(path=path, filter="data")
     else:
-        # Manual validation for older Python versions
+        # Manual validation for older Python versions.
+        # Extract each member individually to prevent a TOCTOU race
+        # where a symlink entry followed by a file entry could write
+        # through the symlink to an arbitrary location.
+        resolved_base = path.resolve()
         for member in tar.getmembers():
+            # Reject symlinks and hardlinks entirely
+            if member.issym() or member.islnk():
+                raise PermissionError(
+                    f"Refusing symlink/hardlink in archive: {member.name}"
+                )
             member_path = (path / member.name).resolve()
-            if not member_path.is_relative_to(path.resolve()):
+            if not member_path.is_relative_to(resolved_base):
                 raise PermissionError(f"Attempted Path Traversal: {member.name}")
-        tar.extractall(path=path)
+            tar.extract(member, path=path)
 
 
 def filter_safe_flags(flags: List[str]) -> List[str]:
