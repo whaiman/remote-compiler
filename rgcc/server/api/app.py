@@ -8,6 +8,7 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+import uuid
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
@@ -46,6 +47,8 @@ if not AUTH_TOKEN:
 # Session tickets issued before a restart remain valid (fixes #18).
 MASTER_TICKET_KEY = derive_key(AUTH_TOKEN, salt=b"master_ticket_v1").hex()
 
+USED_TICKETS: set[str] = set()
+
 
 @dataclass
 class HandshakeRequest:
@@ -74,9 +77,9 @@ async def handshake(request: Request) -> Response:
     priv, pub = generate_ec_keypair()
     aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
 
-    ticket_payload = json.dumps({"key": aes_key, "exp": time.time() + 60}).encode(
-        "utf-8"
-    )
+    ticket_payload = json.dumps(
+        {"key": aes_key, "exp": time.time() + 60, "jti": str(uuid.uuid4())}
+    ).encode("utf-8")
     session_id = encrypt_payload(ticket_payload, MASTER_TICKET_KEY).hex()
 
     resp = HandshakeResponse(public_key=pub, session_id=session_id)
@@ -96,6 +99,11 @@ async def compile(request: Request) -> Response:
         # Check expiration (60 second TTL mitigates replay attacks)
         if time.time() > ticket_data["exp"]:
             return JSONResponse({"detail": "Ticket expired"}, status_code=401)
+
+        jti = ticket_data.get("jti")
+        if not jti or jti in USED_TICKETS:
+            return JSONResponse({"detail": "Ticket already used"}, status_code=401)
+        USED_TICKETS.add(jti)
 
         encryption_key = ticket_data["key"]
     except Exception as e:
