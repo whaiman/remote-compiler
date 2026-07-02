@@ -26,6 +26,7 @@ from rgcc.core.crypto import (
     encrypt_payload,
     generate_ec_keypair,
 )
+from rgcc.core.checksum import verify_checksum
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.security import safe_extract
 from rgcc.server.buildinfo import generate as make_buildinfo
