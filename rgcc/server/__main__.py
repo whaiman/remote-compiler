@@ -7,13 +7,12 @@ from typing import Optional
 
 import typer
 import uvicorn
-import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from rgcc import __version__
-from rgcc.core.config import SERVER_CONFIG_PATH, load_server_config
+from rgcc.core.config import SERVER_CONFIG_PATH, _secure_dump, load_server_config
 
 app = typer.Typer(name="rgccd", help="RGCC Build Server Control Panel")
 console = Console()
@@ -87,8 +86,24 @@ def start(
     final_host = host or server_cfg.get("host", "0.0.0.0")
     final_port = port or server_cfg.get("port", 4444)
 
-    PID_FILE.write_text(str(os.getpid()))
+    if final_host not in ("127.0.0.1", "localhost", "::1"):
+        console.print(
+            Panel(
+                "[bold red]WARNING:[/bold red] The server is bound to a "
+                f"non-loopback address ([bold]{final_host}[/bold]).\n"
+                "This service transmits the auth token and negotiates keys over "
+                "PLAIN HTTP. Without a TLS-terminating reverse proxy or a VPN/"
+                "SSH tunnel in front of it, an active network attacker can steal "
+                "the auth token and man-in-the-middle every request.\n"
+                "Put this behind TLS (nginx/Caddy), WireGuard, or an SSH tunnel "
+                "before exposing it beyond localhost.",
+                title="Security Warning",
+                border_style="red",
+                expand=False,
+            )
+        )
 
+    PID_FILE.write_text(str(os.getpid()))
     console.print(
         Panel(
             f"[bold cyan]RGCC Server v{__version__}[/bold cyan]\n"
@@ -150,8 +165,7 @@ def token(
             cfg["server"] = {}
         cfg["server"]["auth_token"] = new_token
 
-        with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:
-            yaml.dump(cfg, f, default_flow_style=False)
+        _secure_dump(cfg, SERVER_CONFIG_PATH)
 
         console.print("\n[bold green]New Token Generated and Saved![/bold green]")
         console.print(

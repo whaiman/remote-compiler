@@ -17,9 +17,23 @@ _HOST_PLATFORM = PLATFORM_MAP.get(_platform.system().lower(), "linux")
 
 ALLOWED_PLATFORMS = {"linux", "win64", "darwin"}
 ALLOWED_STANDARDS = {
-    "c89", "c90", "c99", "c11", "c17", "c23",
-    "c++11", "c++14", "c++17", "c++20", "c++23",
-    "gnu99", "gnu11", "gnu17", "gnu++17", "gnu++20", "gnu++23"
+    "c89",
+    "c90",
+    "c99",
+    "c11",
+    "c17",
+    "c23",
+    "c++11",
+    "c++14",
+    "c++17",
+    "c++20",
+    "c++23",
+    "gnu99",
+    "gnu11",
+    "gnu17",
+    "gnu++17",
+    "gnu++20",
+    "gnu++23",
 }
 
 
@@ -117,8 +131,8 @@ def _build_command(
         src_path = (src_dir / src).resolve()
         if src_path.is_relative_to(src_dir):
             cmd.append(str(src_path))
-
-    cmd.extend(manifest.link_flags)
+    safe_link_flags = filter_safe_flags(manifest.link_flags)
+    cmd.extend(safe_link_flags)
     cmd.extend(["-o", str(output_path)])
     return cmd
 

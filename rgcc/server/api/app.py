@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from rgcc.core.checksum import verify_checksum
 from rgcc.core.config import load_server_config
 from rgcc.core.crypto import (
     compute_shared_key,
@@ -24,7 +26,6 @@ from rgcc.core.crypto import (
     encrypt_payload,
     generate_ec_keypair,
 )
-from rgcc.core.checksum import verify_checksum
 from rgcc.core.manifest import BuildManifest
 from rgcc.core.security import safe_extract
 from rgcc.server.buildinfo import generate as make_buildinfo
@@ -48,7 +49,7 @@ if not AUTH_TOKEN:
 # Session tickets issued before a restart remain valid (fixes #18).
 MASTER_TICKET_KEY = derive_key(AUTH_TOKEN, salt=b"master_ticket_v1").hex()
 
-USED_TICKETS: set[str] = set()
+USED_TICKETS: dict[str, float] = {}
 MAX_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
@@ -66,8 +67,18 @@ class HandshakeResponse:
         return asdict(self)
 
 
+def _prune_used_tickets() -> None:
+    """Drop ticket records whose TTL (60s handshake window) has long passed."""
+    now = time.time()
+    expired = [jti for jti, exp in USED_TICKETS.items() if exp < now]
+    for jti in expired:
+        del USED_TICKETS[jti]
+
+
 async def handshake(request: Request) -> Response:
-    if request.headers.get("Authorization") != f"Bearer {AUTH_TOKEN}":
+    presented = request.headers.get("Authorization", "")
+    expected = f"Bearer {AUTH_TOKEN}"
+    if not hmac.compare_digest(presented, expected):
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
     try:
@@ -104,11 +115,11 @@ async def compile(request: Request) -> Response:
         # Check expiration (60 second TTL mitigates replay attacks)
         if time.time() > ticket_data["exp"]:
             return JSONResponse({"detail": "Ticket expired"}, status_code=401)
-
+        _prune_used_tickets()
         jti = ticket_data.get("jti")
         if not jti or jti in USED_TICKETS:
             return JSONResponse({"detail": "Ticket already used"}, status_code=401)
-        USED_TICKETS.add(jti)
+        USED_TICKETS[jti] = ticket_data["exp"]
 
         encryption_key = ticket_data["key"]
     except Exception as e:
