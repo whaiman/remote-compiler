@@ -1,4 +1,6 @@
+import os
 import secrets
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +9,13 @@ import yaml  # type: ignore
 # We use per-project configuration files by default
 SERVER_CONFIG_PATH = Path.cwd() / "rgccd.yaml"
 CLIENT_CONFIG_PATH = Path.cwd() / "rgcc.yaml"
+
+
+def _secure_dump(config: dict[str, Any], path: Path) -> None:
+    """Write YAML config and lock permissions to owner-only (contains secrets)."""
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False)
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
 
 
 def load_server_config() -> dict[str, Any]:
@@ -50,8 +59,7 @@ def load_server_config() -> dict[str, Any]:
                 },
             },
         }
-        with open(SERVER_CONFIG_PATH, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, default_flow_style=False)
+        _secure_dump(config, SERVER_CONFIG_PATH)
         return config
 
     with open(SERVER_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -69,8 +77,7 @@ def load_client_config() -> dict[str, Any]:
             }
         }
         CLIENT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(CLIENT_CONFIG_PATH, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, default_flow_style=False)
+        _secure_dump(config, SERVER_CONFIG_PATH)
         return config
 
     with open(CLIENT_CONFIG_PATH, "r", encoding="utf-8") as f:
