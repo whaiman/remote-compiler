@@ -1,5 +1,17 @@
 # RGCC - Remote GCC Compiler System
 
+```sh
+┌────────────────────────────────────────┐
+│ $ rgcc compile main.cpp                │
+│ Remote Compiler: Preparing main.cpp... │
+│ Uploading and compiling...             │
+│                                        │
+│ Compilation successful!                │
+│ Duration: 0.84s                        │
+│ Artifacts saved to: dist/              │
+└────────────────────────────────────────┘
+```
+
 Offload C/C++ builds from a resource-constrained device to a real machine. Encrypted end-to-end, single binary on each side, no daemon babysitting required.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
