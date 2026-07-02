@@ -77,7 +77,7 @@ def load_client_config() -> dict[str, Any]:
             }
         }
         CLIENT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _secure_dump(config, SERVER_CONFIG_PATH)
+        _secure_dump(config, CLIENT_CONFIG_PATH)
         return config
 
     with open(CLIENT_CONFIG_PATH, "r", encoding="utf-8") as f:
