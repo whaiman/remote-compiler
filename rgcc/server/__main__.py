@@ -1,10 +1,10 @@
 import logging
 import os
 import secrets
-import signal
 from pathlib import Path
 from typing import Optional
 
+import psutil
 import typer
 import uvicorn
 from rich.console import Console
@@ -18,6 +18,15 @@ app = typer.Typer(name="rgccd", help="RGCC Build Server Control Panel")
 console = Console()
 
 PID_FILE = Path.cwd() / "rgccd.pid"
+
+
+def _process_is_running(pid: int) -> bool:
+    """Return True if a process with the given PID is alive."""
+    try:
+        proc = psutil.Process(pid)
+        return proc.status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return False
 
 
 def _get_pid() -> Optional[int]:
@@ -59,14 +68,11 @@ def start(
     """Start the build server daemon."""
     pid = _get_pid()
     if pid:
-        # Check if process actually exists
-        try:
-            os.kill(pid, 0)
+        if _process_is_running(pid):
             console.print(f"[bold red]Error:[/bold red] Server is already running (PID: {pid})")
             raise typer.Exit(1)
-        except OSError:
             # Process doesn't exist, stale PID file
-            PID_FILE.unlink()
+        PID_FILE.unlink(missing_ok=True)
 
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -131,17 +137,36 @@ def stop():
         )
         return
 
-    try:
-        os.kill(pid, signal.SIGTERM)
-        console.print(f"Stopping server (PID: [bold cyan]{pid}[/bold cyan])...")
-        if PID_FILE.exists():
-            PID_FILE.unlink()
-    except OSError:
+    if not _process_is_running(pid):
         console.print(
-            f"[bold red]Error:[/bold red] Could not stop process {pid}. It might have already exited."
+            f"[bold yellow]Warning:[/bold yellow] Process {pid} is not running. Cleaning up PID file."
         )
-        if PID_FILE.exists():
-            PID_FILE.unlink()
+        PID_FILE.unlink(missing_ok=True)
+        return
+
+    try:
+        proc = psutil.Process(pid)
+        proc.terminate()
+        proc.wait(timeout=10)
+        console.print(f"Server stopped (PID: [bold cyan]{pid}[/bold cyan])")
+    except psutil.TimeoutExpired:
+        proc.kill()  # force kill
+        console.print(f"[bold yellow]Force-killed[/bold yellow] server (PID: {pid})")
+    except psutil.NoSuchProcess:
+        console.print(f"[bold yellow]Warning:[/bold yellow] Process {pid} already exited.")
+    finally:
+        PID_FILE.unlink(missing_ok=True)
+    # try:
+    #     os.kill(pid, signal.SIGTERM)
+    #     console.print(f"Stopping server (PID: [bold cyan]{pid}[/bold cyan])...")
+    #     if PID_FILE.exists():
+    #         PID_FILE.unlink()
+    # except OSError:
+    #     console.print(
+    #         f"[bold red]Error:[/bold red] Could not stop process {pid}. It might have already exited."
+    #     )
+    #     if PID_FILE.exists():
+    #         PID_FILE.unlink()
 
 
 @app.command()
@@ -184,14 +209,15 @@ def stats():
     """Show server status and metadata."""
     cfg = load_server_config()
     pid = _get_pid()
+    is_running = bool(pid and _process_is_running(pid))
 
     table = Table(title="RGCC Server Status", show_header=False, expand=False)
     table.add_row("Version", f"[cyan]{__version__}[/cyan]")
     table.add_row(
         "Status",
-        "[bold green]Running[/bold green]" if pid else "[bold dim]Stopped[/bold dim]",
+        ("[bold green]Running[/bold green]" if is_running else "[bold dim]Stopped[/bold dim]"),
     )
-    if pid:
+    if is_running:
         table.add_row("PID", str(pid))
     table.add_row("Config Path", str(SERVER_CONFIG_PATH))
     table.add_row("Host", cfg.get("server", {}).get("host", "0.0.0.0"))
