@@ -23,6 +23,11 @@ class ApiClient:
         self.auth_token: str = auth_token
         self.session_id: Optional[str] = None
         self.encryption_key: Optional[str] = None
+        if self.endpoint.startswith("http://"):
+            logger.warning(
+                "Connecting over plain HTTP - the ECDH handshake is exposed to MITM. "
+                "Use HTTPS (or a tunnel) for anything beyond a trusted network."
+            )
 
     async def negotiate_key(self) -> None:
         """Negotiate an AES encryption key via ECDH exchange."""
