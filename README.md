@@ -86,17 +86,111 @@ Additional hardening:
 
 ## Installation
 
+RGCC runs on Linux, macOS, and Windows. Both entry points - `rgcc` (client) and `rgccd` (server) - ship as a single Python package. Install it with an isolated-environment tool such as `pipx` or `uv`; a plain `pip install` into the system interpreter is not a supported path: on PEP 668 systems (Arch, Debian 12+, Fedora, Homebrew's Python) pip refuses outright, and everywhere else it scatters the package and its dependencies across the global environment.
+
+### Option 1: pipx
+
 ```bash
-pip install "remote-compiler @ git+https://github.com/whaiman/remote-compiler.git"
+pipx install "remote-compiler @ git+https://github.com/whaiman/remote-compiler.git"
 ```
 
-Or for local development:
+Don't have pipx yet?
+
+| OS | Command |
+| --- | --- |
+| Arch | `sudo pacman -S pipx` |
+| Debian/Ubuntu | `sudo apt install pipx` |
+| Fedora | `sudo dnf install pipx` |
+| macOS | `brew install pipx` |
+| Windows | `py -m pip install --user pipx` (or `scoop` / `choco`) |
+| Any OS with Python | `python -m pip install --user pipx` (fallback if none of the above apply) |
+
+### Option 2: uv
+
+```bash
+uv tool install "remote-compiler @ git+https://github.com/whaiman/remote-compiler.git"
+```
+
+Don't have uv yet?
+
+| OS | Command |
+| --- | --- |
+| Arch | `sudo pacman -S uv` |
+| macOS | `brew install uv` |
+| Windows | `winget install --id=astral-sh.uv -e` |
+
+Or the standalone installers, no package manager needed:
+
+#### macOS / Linux
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Windows (PowerShell)
+
+```bash
+powershell -ExecutionPolicy ByPass -c "irm <https://astral.sh/uv/install.ps1> | iex"
+```
+
+### Option 3: run without installing (uv only)
+
+`uvx` executes the tool straight from cache, no install step:
+
+```bash
+uvx --from "remote-compiler @ git+https://github.com/whaiman/remote-compiler.git" rgcc --help
+```
+
+### Updating and removing
+
+```bash
+# pipx
+pipx reinstall remote-compiler     # always fetches the latest commit
+pipx uninstall remote-compiler
+
+# uv
+uv tool upgrade remote-compiler    # add --reinstall to force the latest commit
+uv tool uninstall remote-compiler
+```
+
+**Notes:**
+
+- `pipx` and `uv` put `rgcc` and `rgccd` on your PATH (`~/.local/bin` on Linux/macOS, `%USERPROFILE%\.local\bin` on Windows). If the commands are not found, run `pipx ensurepath` or `uv tool update-shell` and restart the terminal.
+- The machine running `rgccd` needs a compiler toolchain; a client-only device does not:
+  - Linux: `sudo pacman -S gcc` / `sudo apt install build-essential` / `sudo dnf install gcc-c++`
+  - macOS: `xcode-select --install` (Apple clang) or `brew install gcc`
+  - Windows: MinGW-w64 via MSYS2, or `winget install LLVM.LLVM`
+- Server-only machine? The Docker image ships `rgccd` with GCC, Clang, and MinGW preinstalled - the client still has to be installed on the device you compile from.
+- Termux (the phone-client case): Termux's Python isn't externally managed, so `pkg install python && pip install "remote-compiler @ git+https://github.com/whaiman/remote-compiler.git"` is the normal install path there.
+- Not yet packaged for distro repositories (AUR, nixpkgs, Homebrew) - if you package it, a README PR is welcome.
+
+To work on RGCC itself, see [Development](#development).
+
+---
+
+## Development
 
 ```bash
 git clone https://github.com/whaiman/remote-compiler.git
 cd remote-compiler
-make install
+python -m venv .venv
+source .venv/bin/activate # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 ```
+
+(Debian/Ubuntu: if `python -m venv` fails, install it first - `sudo apt install python3-venv`.)
+
+Already using `uv`? It does the same thing in one step:
+
+```bash
+uv sync --extra dev
+```
+
+Then `make test`, `make lint`, `make format` work the same either way.
+
+`uv sync --extra dev` reads `pyproject.toml`, creates `.venv` if it doesn't exist yet, and installs the project in editable mode together with `[project.optional-dependencies].dev` - the same PEP-668-safe approach as the install options above, so there's nothing extra to remember between "using RGCC" and "hacking on RGCC".
+
+Don't have `uv`? See [Option 2](#option-2-uv) above.
 
 ---
 
