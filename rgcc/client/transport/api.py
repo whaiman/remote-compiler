@@ -31,7 +31,10 @@ class ApiClient:
             resp = await client.post(
                 f"{self.endpoint}/api/handshake",
                 json={"public_key": pub},
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.auth_token}",
+                },
                 timeout=10,
             )
             if resp.status_code != 200:
