@@ -86,9 +86,7 @@ class ApiClient:
                     try:
                         current_key = self.encryption_key
                         if current_key is None:
-                            raise ValueError(
-                                "No encryption key available for decryption"
-                            )
+                            raise ValueError("No encryption key available for decryption")
                         decrypted_err = decrypt_payload(response.content, current_key)
                         detail = decrypted_err.decode("utf-8")
                     except Exception:

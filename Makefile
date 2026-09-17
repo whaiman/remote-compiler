@@ -6,7 +6,7 @@ PIP    := pip
 IMAGE_PREFIX := rgcc
 
 help:
-    @echo "RGCC - Remote GCC Compiler System"
+    @echo "RGCC - Remote GCC System"
     @echo ""
     @echo "Installation:"
     @echo "  install           Install the unified package (-e ., requires a venv)"

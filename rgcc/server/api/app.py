@@ -87,9 +87,7 @@ async def handshake(request: Request) -> Response:
         req = HandshakeRequest(**data)
     except (json.JSONDecodeError, TypeError) as e:
         logger.warning(f"Invalid handshake request: {e}")
-        return JSONResponse(
-            {"detail": "Invalid request body or missing fields"}, status_code=400
-        )
+        return JSONResponse({"detail": "Invalid request body or missing fields"}, status_code=400)
 
     priv, pub = generate_ec_keypair()
     aes_key = compute_shared_key(priv, req.public_key, AUTH_TOKEN)
@@ -184,9 +182,7 @@ async def compile(request: Request) -> Response:
         else:
             sources = list(src_dir.glob("*.cpp")) or list(src_dir.glob("*.c"))
             if not sources:
-                return JSONResponse(
-                    {"detail": "No source files found"}, status_code=400
-                )
+                return JSONResponse({"detail": "No source files found"}, status_code=400)
             comp_result = run_fallback_compilation(sources[0], work_dir / "a.out")
 
         # 4. Update job store
@@ -227,8 +223,7 @@ async def compile(request: Request) -> Response:
                         info = make_buildinfo(
                             compiler=manifest.compiler,
                             standard=manifest.standard,
-                            flags=manifest.flags
-                            + get_repro_flags(src_dir, normalize=True),
+                            flags=manifest.flags + get_repro_flags(src_dir, normalize=True),
                             platform_target=manifest.platform,
                             source_dir=src_dir,
                             binary_path=comp_result.output_path,

@@ -1,4 +1,4 @@
-# RGCC - Remote GCC Compiler System
+# RGCC - Remote GCC
 
 ```sh
 ┌────────────────────────────────────────┐
@@ -168,32 +168,6 @@ To work on RGCC itself, see [Development](#development).
 
 ---
 
-## Development
-
-```bash
-git clone https://github.com/whaiman/remote-compiler.git
-cd remote-compiler
-python -m venv .venv
-source .venv/bin/activate # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-```
-
-(Debian/Ubuntu: if `python -m venv` fails, install it first - `sudo apt install python3-venv`.)
-
-Already using `uv`? It does the same thing in one step:
-
-```bash
-uv sync --extra dev
-```
-
-Then `make test`, `make lint`, `make format` work the same either way.
-
-`uv sync --extra dev` reads `pyproject.toml`, creates `.venv` if it doesn't exist yet, and installs the project in editable mode together with `[project.optional-dependencies].dev` - the same PEP-668-safe approach as the install options above, so there's nothing extra to remember between "using RGCC" and "hacking on RGCC".
-
-Don't have `uv`? See [Option 2](#option-2-uv) above.
-
----
-
 ## Quickstart
 
 ### 1. Build server
@@ -318,8 +292,17 @@ To publish images to a registry (GHCR, Docker Hub, etc.), set up CI for it - thi
 ```bash
 git clone https://github.com/whaiman/remote-compiler.git
 cd remote-compiler
-make install-dev
-make test
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+```
+
+(Debian/Ubuntu: if `python -m venv` fails, install it first - `sudo apt install python3-venv`.)
+
+Already using `uv`? It does the same thing in one step:
+
+```bash
+uv sync --extra dev
 ```
 
 ```text
@@ -334,6 +317,10 @@ make lint              ruff + black --check
 make format             ruff format + fix
 make clean               Remove build artifacts and caches
 ```
+
+`uv sync --extra dev` reads `pyproject.toml`, creates `.venv` if it doesn't exist yet, and installs the project in editable mode together with `[project.optional-dependencies].dev` - the same PEP-668-safe approach as the install options above, so there's nothing extra to remember between "using RGCC" and "hacking on RGCC".
+
+Don't have `uv`? See [Option 2](#option-2-uv) above.
 
 ### Repository structure
 

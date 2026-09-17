@@ -54,9 +54,7 @@ def callback(
 def start(
     host: Optional[str] = typer.Option(None, help="Override host from config"),
     port: Optional[int] = typer.Option(None, help="Override port from config"),
-    reload: bool = typer.Option(
-        False, "--reload", help="Enable auto-reload (development)"
-    ),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (development)"),
 ):
     """Start the build server daemon."""
     pid = _get_pid()
@@ -64,18 +62,14 @@ def start(
         # Check if process actually exists
         try:
             os.kill(pid, 0)
-            console.print(
-                f"[bold red]Error:[/bold red] Server is already running (PID: {pid})"
-            )
+            console.print(f"[bold red]Error:[/bold red] Server is already running (PID: {pid})")
             raise typer.Exit(1)
         except OSError:
             # Process doesn't exist, stale PID file
             PID_FILE.unlink()
 
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     # Set fixed epoch for reproducible builds
     os.environ["SOURCE_DATE_EPOCH"] = "1778616000"
@@ -152,9 +146,7 @@ def stop():
 
 @app.command()
 def token(
-    new: bool = typer.Option(
-        False, "--new", help="Generate and save a fresh auth token"
-    ),
+    new: bool = typer.Option(False, "--new", help="Generate and save a fresh auth token"),
 ):
     """View or regenerate the server authentication token."""
     cfg = load_server_config()

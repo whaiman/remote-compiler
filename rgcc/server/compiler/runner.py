@@ -53,9 +53,7 @@ def get_repro_flags(src_dir: Path, normalize: bool = False) -> list[str]:
     normalize=False - for compiler (real path is important)."""
 
     prefix_map = (
-        "-ffile-prefix-map=<src>=."
-        if normalize
-        else f"-ffile-prefix-map={src_dir.as_posix()}=."
+        "-ffile-prefix-map=<src>=." if normalize else f"-ffile-prefix-map={src_dir.as_posix()}=."
     )
     return [prefix_map, "-Werror=date-time"]
 
@@ -65,13 +63,8 @@ def _build_command(
 ) -> list[str]:
     """Assemble the compiler command from manifest + server config."""
     compilers_cfg = config.get("compilers", {})
-    if (
-        manifest.compiler not in compilers_cfg
-        and manifest.compiler not in ALLOWED_COMPILERS
-    ):
-        raise ValueError(
-            f"Compiler '{manifest.compiler}' is not allowed on this server."
-        )
+    if manifest.compiler not in compilers_cfg and manifest.compiler not in ALLOWED_COMPILERS:
+        raise ValueError(f"Compiler '{manifest.compiler}' is not allowed on this server.")
 
     compiler_cfg = compilers_cfg.get(manifest.compiler, {})
     platform_cfg = compiler_cfg.get("platforms", {}).get(manifest.platform, {})

@@ -78,9 +78,7 @@ def safe_extract(tar: tarfile.TarFile, path: Path) -> None:
         for member in tar.getmembers():
             # Reject symlinks and hardlinks entirely
             if member.issym() or member.islnk():
-                raise PermissionError(
-                    f"Refusing symlink/hardlink in archive: {member.name}"
-                )
+                raise PermissionError(f"Refusing symlink/hardlink in archive: {member.name}")
             member_path = (path / member.name).resolve()
             if not member_path.is_relative_to(resolved_base):
                 raise PermissionError(f"Attempted Path Traversal: {member.name}")
@@ -108,9 +106,7 @@ def filter_safe_flags(flags: List[str]) -> List[str]:
             # If this flag takes a separate next-token argument and the value
             # is not inlined via "=", skip the next token too.
             flag_lower = flag.split("=")[0].lower().strip()
-            if "=" not in flag and any(
-                flag_lower.startswith(d) for d in _DANGEROUS_FLAGS_WITH_ARG
-            ):
+            if "=" not in flag and any(flag_lower.startswith(d) for d in _DANGEROUS_FLAGS_WITH_ARG):
                 skip_next = True
             continue
 

@@ -24,7 +24,7 @@ from rgcc.core.manifest import SOURCE_EXTENSIONS, BuildManifest
 from rgcc.core.platforms import PLATFORM_MAP
 from rgcc.core.security import safe_extract
 
-app = typer.Typer(name="rgcc", help="Remote GCC Compiler Client")
+app = typer.Typer(name="rgcc", help="Remote GCC Client")
 console = Console()
 
 logging.basicConfig(
@@ -54,7 +54,7 @@ def callback(
         ),
     ] = None,
 ) -> None:
-    """RGCC - Remote GCC Compiler System."""
+    """RGCC - Remote GCC System."""
 
 
 # ─── Smart Defaults ────────────────────────────────────────────────────────────
@@ -210,13 +210,9 @@ def _apply_cli_overrides(
     manifest.output = _output_name(Path(manifest.output).stem, manifest.platform)
 
 
-def _run_interactive(
-    manifest: BuildManifest, entry_point: Path, local_manifest_path: Path
-) -> None:
+def _run_interactive(manifest: BuildManifest, entry_point: Path, local_manifest_path: Path) -> None:
     """Prompt the user to configure the manifest interactively."""
-    console.print(
-        "\n[bold yellow]--- Interactive Build Configuration ---[/bold yellow]"
-    )
+    console.print("\n[bold yellow]--- Interactive Build Configuration ---[/bold yellow]")
 
     # Apply smarter defaults if manifest uses generic values
     if manifest.compiler in ("g++", "gcc"):
@@ -234,12 +230,8 @@ def _run_interactive(
     manifest.platform = typer.prompt("Target platform", default=manifest.platform)
     manifest.output = typer.prompt("Output binary name", default=manifest.output)
     manifest.out_dir = typer.prompt("Artifacts directory", default=manifest.out_dir)
-    manifest.save_logs = typer.confirm(
-        "Save compilation logs?", default=manifest.save_logs
-    )
-    manifest.save_manifest = typer.confirm(
-        "Save result manifest?", default=manifest.save_manifest
-    )
+    manifest.save_logs = typer.confirm("Save compilation logs?", default=manifest.save_logs)
+    manifest.save_manifest = typer.confirm("Save result manifest?", default=manifest.save_manifest)
 
     # Re-apply correct extension after user may have typed a new platform
     manifest.output = _output_name(Path(manifest.output).stem, manifest.platform)
@@ -255,9 +247,7 @@ def _run_interactive(
     if typer.confirm("Save these settings to build.json for next time?"):
         try:
             manifest.save_config(local_manifest_path)
-            console.print(
-                f"[bold green]Settings saved to {local_manifest_path}[/bold green]"
-            )
+            console.print(f"[bold green]Settings saved to {local_manifest_path}[/bold green]")
         except Exception as e:
             console.print(f"[bold red]Failed to save build.json:[/bold red] {e}")
 
@@ -338,9 +328,7 @@ def _verify_buildinfo(out_dist: Path, binary_name: str) -> None:
     """Verify that the binary matches the buildinfo.json hash."""
     buildinfo_path = out_dist / "buildinfo.json"
     if not buildinfo_path.exists():
-        console.print(
-            "[yellow]Warning:[/yellow] buildinfo.json not found - build not verifiable"
-        )
+        console.print("[yellow]Warning:[/yellow] buildinfo.json not found - build not verifiable")
         return
 
     try:
@@ -382,13 +370,9 @@ def compile(
     output: Optional[str] = typer.Option(
         None, "-o", "--output", help="Output filename (default: entry point stem)"
     ),
-    endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", help="API endpoint override"
-    ),
+    endpoint: Optional[str] = typer.Option(None, "--endpoint", help="API endpoint override"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Don't transfer to server"),
-    compile_only: bool = typer.Option(
-        False, "--compile-only", help="Compile only, don't link"
-    ),
+    compile_only: bool = typer.Option(False, "--compile-only", help="Compile only, don't link"),
     standard: Optional[str] = typer.Option(
         None,
         "--std",
@@ -495,9 +479,7 @@ def compile(
             archive_path = _build_archive(work_dir, all_sources, project_root, manifest)
 
             if dry_run:
-                console.print(
-                    f"[bold blue]Dry run complete.[/bold blue] Archive: {archive_path}"
-                )
+                console.print(f"[bold blue]Dry run complete.[/bold blue] Archive: {archive_path}")
                 return
 
             progress.add_task("Uploading and compiling...", total=None)
@@ -565,9 +547,7 @@ def compile(
                 progress.add_task("Uploading and compiling...", total=None)
                 response_encrypted = asyncio.run(api_client.send_payload(archive_path))
                 progress.add_task("Downloading artifacts...", total=None)
-                response_data = asyncio.run(
-                    api_client.decrypt_response(response_encrypted)
-                )
+                response_data = asyncio.run(api_client.decrypt_response(response_encrypted))
 
             result_archive_path = work_dir / "result.tar.gz"
             result_archive_path.write_bytes(response_data)
@@ -597,9 +577,7 @@ def init(
         "--platform",
         help="Target platform (linux, win64, darwin). Defaults to current OS.",
     ),
-    out_dir: str = typer.Option(
-        "dist", "-d", "--out-dir", help="Default artifacts directory"
-    ),
+    out_dir: str = typer.Option("dist", "-d", "--out-dir", help="Default artifacts directory"),
 ) -> None:
     """Create a build.json file for this project."""
     if not entry_point.exists():
@@ -610,9 +588,7 @@ def init(
     project_root = _resolve_project_root(entry_point)
     manifest_path = project_root / "build.json"
 
-    if manifest_path.exists() and not typer.confirm(
-        "build.json already exists. Overwrite?"
-    ):
+    if manifest_path.exists() and not typer.confirm("build.json already exists. Overwrite?"):
         console.print("Cancelled.")
         return
 
