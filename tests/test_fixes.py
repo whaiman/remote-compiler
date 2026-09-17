@@ -1,11 +1,7 @@
 """Tests for fixes #18, #19, #21."""
 
-import sys
-import tempfile
 import time
 from pathlib import Path
-
-import pytest
 
 
 # ---------------------------------------------------------------------------
