@@ -1,6 +1,6 @@
 [project]
 name = "remote-compiler"
-version = "2.1.0"
+version = "1.2.2"
 description = "Remote GCC System"
 authors = [{name = "whaiman"}]
 dependencies = [
