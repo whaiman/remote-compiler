@@ -6,9 +6,7 @@ import sys
 
 
 def run_isolated(code: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=False
-    )
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
 
 
 def test_client_is_lazy():
