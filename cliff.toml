@@ -26,9 +26,20 @@ trim = true
 
 [git]
 conventional_commits = true
-filter_unconventional = true
+filter_unconventional = false
 split_commits = false
+
+commit_preprocessors = [
+    # Old security merge commits contain a long body with duplicated
+    # commit descriptions. Keep only their actual title.
+    { pattern = "(?is)^(Fix/security issues \\(#[0-9]+\\)).*$", replace = "$1" },
+]
+
 commit_parsers = [
+    # Explicit security commits.
+    { message = "^(feat|fix).*security", group = "Security" },
+    { message = "^Fix/security issues", group = "Security" },
+
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
     { message = "^doc", group = "Documentation" },
@@ -36,11 +47,21 @@ commit_parsers = [
     { message = "^refactor", group = "Refactoring" },
     { message = "^test", group = "Testing" },
     { message = "^style", group = "Styling" },
+    { message = "^ci", group = "CI" },
+
+    # Release-preparation/versioning commits should not appear in release notes.
     { message = "^chore\\(release\\): prepare for", skip = true },
+    { message = "^chore: normalize version to", skip = true },
+
     { message = "^chore", group = "Miscellaneous" },
-    { body = ".*security", group = "Security" },
+
+    # Keep every remaining commit instead of silently dropping it.
+    { message = ".*", group = "Miscellaneous" },
 ]
+
 protect_breaking_commits = false
 filter_commits = false
+fail_on_unmatched_commit = false
+
 tag_pattern = "v[0-9].*"
 sort_commits = "oldest"
